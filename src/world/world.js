@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { noise2, fbm, ridged, rand } from './noise.js';
-import { grassTexture, mudTexture, earthTexture, hillTexture, thatchTexture, plasterTexture, frondTexture, setAnisotropy } from './textures.js';
+import { grassTexture, mudTexture, earthTexture, hillTexture, thatchTexture, plasterTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
 
 export const VS = 1.6;                       // vertical scale: 1 m of water or rice = 1.6 world units
 const FW = 48, FD = 32;                      // rice field size (world units), centred on the origin
@@ -45,6 +45,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   controls.maxPolarAngle = 1.42;
   controls.zoomSpeed = 0.8;
   controls.rotateSpeed = 0.6;
+  // Camera moves are eased and can be interrupted: grabbing the view stops a move where it is.
+  let fly = null;
+  controls.addEventListener('start', () => { fly = null; });
 
   // ---------------------------------------------------------------- sky, light
   const SUN_DIR = new THREE.Vector3(-0.82, 0.5, -0.28).normalize();      // afternoon sun from the west, raking across the field
@@ -127,6 +130,8 @@ export function createWorld(canvas, { mobile = false } = {}) {
   };
   const target = { ...view, tint: view.tint.clone(), soil: view.soil.clone() };
   let mode = 'title';
+  let started = false;                          // the first title shot is placed, not flown to
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let satT = 0;                                 // 0 = ground camera, 1 = satellite camera
   const savedCam = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
 
@@ -196,34 +201,45 @@ export function createWorld(canvas, { mobile = false } = {}) {
   }
 
   // ---------------------------------------------------------------- camera modes
+  /** Ease the camera to a new view; instant when asked (first frame) or when the person prefers less motion. */
+  function flyTo(pos, tgt, dur = 1.4, instant = false) {
+    if (instant || reduceMotion.matches) { fly = null; camera.position.copy(pos); controls.target.copy(tgt); return; }
+    fly = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), toPos: pos.clone(), toTarget: tgt.clone(), t: 0, dur };
+    controls.autoRotate = false;
+    controls.maxDistance = 2000;                     // no zoom clamp while flying (satellite height to ground)
+  }
+
   function setMode(m) {
     if (m === mode) return;
+    const first = !started;
     if (m === 'satellite') { savedCam.pos.copy(camera.position); savedCam.target.copy(controls.target); }
-    if (mode === 'satellite' && m !== 'satellite') { camera.position.copy(savedCam.pos); controls.target.copy(savedCam.target); }
+    if (mode === 'satellite' && m !== 'satellite') flyTo(savedCam.pos, savedCam.target, 1.2);
     mode = m;
-    controls.autoRotate = m === 'title';
+    controls.autoRotate = m === 'title' && !fly;
     controls.autoRotateSpeed = 0.35;
-    controls.maxDistance = m === 'satellite' ? 900 : 190;
     controls.maxPolarAngle = m === 'satellite' ? 1.2 : 1.42;
     if (m === 'satellite') {
       const flood = hazard !== 'drought';
-      controls.target.set(flood ? 35 : 0, 0, flood ? -290 : 0);
-      camera.position.set(flood ? 40 : 10, flood ? 850 : 230, flood ? 220 : 110);
-    } else if (m === 'play' || m === 'title') {
-      if (m === 'title') { camera.position.set(60, 26, 70); controls.target.set(0, 4, -40); }
+      flyTo(new THREE.Vector3(flood ? 40 : 10, flood ? 850 : 230, flood ? 220 : 110), new THREE.Vector3(flood ? 35 : 0, 0, flood ? -290 : 0), 1.6);
+    } else if (m === 'title') {
+      flyTo(new THREE.Vector3(60, 26, 70), new THREE.Vector3(0, 4, -40), 1.6, first);
     }
   }
-  function resetCamera() { camera.position.set(44, 20, 52); controls.target.set(0, 0, -6); }
+  function resetCamera() { flyTo(new THREE.Vector3(44, 20, 52), new THREE.Vector3(0, 0, -6), 1.3); }
 
   // ---------------------------------------------------------------- per-frame
   let t = 0, flashT = 0;
   function frame(dt) {
     dt = Math.min(dt, 0.1);
+    started = true;
     t += dt;
     const k = 1 - Math.exp(-dt * 2.6);
-    for (const key of ['lakeY', 'fieldWaterY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac']) {
+    for (const key of ['lakeY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac']) {
       view[key] += (target[key] - view[key]) * k;
     }
+    // the field fills more slowly than the lake rises, so the water is seen pouring over the bund
+    const fill = target.fieldWaterY > view.fieldWaterY ? 0.55 : 2.6;
+    view.fieldWaterY += (target.fieldWaterY - view.fieldWaterY) * (1 - Math.exp(-dt * fill));
     view.tint.lerp(target.tint, k);
     view.soil.lerp(target.soil, k);
     satT += ((mode === 'satellite' ? 1 : 0) - satT) * (1 - Math.exp(-dt * 4));
@@ -258,8 +274,16 @@ export function createWorld(canvas, { mobile = false } = {}) {
     parts.update?.(t, dt, view, satT);
     rice.mesh.visible = true;
 
+    if (fly) {
+      fly.t = Math.min(1, fly.t + dt / fly.dur);
+      const e = 1 - Math.pow(1 - fly.t, 4);          // ease-out: fast start, long gentle settle
+      camera.position.lerpVectors(fly.fromPos, fly.toPos, e);
+      controls.target.lerpVectors(fly.fromTarget, fly.toTarget, e);
+      if (fly.t >= 1) { fly = null; controls.autoRotate = mode === 'title'; }
+    }
+    if (!fly) controls.maxDistance = mode === 'satellite' ? 900 : 190;
     controls.update();
-    if (mode !== 'satellite') clampTarget();
+    if (mode !== 'satellite' && !fly) clampTarget();
     renderer.render(scene, camera);
   }
 
@@ -282,7 +306,14 @@ export function createWorld(canvas, { mobile = false } = {}) {
 
   /** Lower the resolution if the device is struggling (called by the frame-time monitor). */
   function degrade() {
-    if (pixelRatio <= 0.75) return false;
+    if (pixelRatio <= 0.75) {
+      if (!renderer.shadowMap.enabled) return false;
+      // last step on a struggling device: no shadows
+      renderer.shadowMap.enabled = false;
+      sun.castShadow = false;
+      scene.traverse((o) => { if (o.material) for (const mt of [].concat(o.material)) mt.needsUpdate = true; });
+      return true;
+    }
     pixelRatio = Math.max(0.75, pixelRatio - 0.35);
     renderer.setPixelRatio(pixelRatio);
     resize();
@@ -335,10 +366,26 @@ export function createWorld(canvas, { mobile = false } = {}) {
     hills.position.set(0, 0, -470);
     group.add(hills);
     // lake water and field water
-    const lake = water(1700, 380, mobile ? 50 : 90, mobile ? 12 : 22, '#2b5b72', 0.94);
-    lake.mesh.position.set(0, -0.5, LAKE_EDGE - 190);
+    // the lake runs right up under the north bund: while it is low the bank hides it, as it rises it creeps up to the bund
+    const lakeSouth = -FD / 2 - 0.3, lakeDepth = 380;
+    const lake = water(1700, lakeDepth, mobile ? 50 : 90, mobile ? 12 : 22, '#2b5b72', 0.94, [70, 16]);
+    lake.mesh.position.set(0, -0.5, lakeSouth - lakeDepth / 2);
     group.add(lake.mesh);
-    const fieldWater = water(FW, FD, 16, 10, '#5b7880', 0.78);
+    // foam where the water presses on the bund, and a sheet of water pouring over it into the field
+    const foam = new THREE.Mesh(new THREE.PlaneGeometry(FW + 4, 1.6), new THREE.MeshBasicMaterial({ color: '#eef6fb', alphaMap: foamTexture(), transparent: true, opacity: 0, depthWrite: false }));
+    foam.rotation.x = -Math.PI / 2;
+    foam.position.set(0, -0.5, -FD / 2 - 1.5);
+    foam.material.alphaMap.wrapS = foam.material.alphaMap.wrapT = THREE.RepeatWrapping;
+    foam.material.alphaMap.repeat.set(8, 1);
+    group.add(foam);
+    const spillTex = spillTexture();
+    const spill = new THREE.Mesh(new THREE.PlaneGeometry(FW, 1, 1, 1), new THREE.MeshBasicMaterial({ color: '#cfe6f2', alphaMap: spillTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    spill.geometry.translate(0, -0.5, 0);           // hangs down from its top edge
+    spill.position.set(0, 0, -FD / 2 + 0.55);
+    spill.rotation.x = -0.35;                        // leaning into the field, like water sliding down the inner face
+    spill.visible = false;
+    group.add(spill);
+    const fieldWater = water(FW, FD, 16, 10, '#5b7880', 0.78, [6, 4]);
     fieldWater.mesh.position.set(0, -0.4, 0);
     group.add(fieldWater.mesh);
     // paddy soil, bund, neighbours, hut, trees, boat
@@ -374,6 +421,22 @@ export function createWorld(canvas, { mobile = false } = {}) {
     out.update = (time, dt, v, sat) => {
       lake.mesh.position.y = v.lakeY;
       lake.wave(time, 0.12 + v.storm * 0.25);
+      // water against the bund: foam once it touches, a pouring sheet once it is over the top
+      const touching = smooth(-0.05, 0.25, v.lakeY), over = smooth(0, 0.18, v.lakeY - v.bundH);
+      const pressing = smooth(v.bundH - 0.6, v.bundH, v.lakeY);
+      foam.position.y = v.lakeY + 0.04;
+      foam.material.opacity = touching * (0.25 + 0.55 * pressing) * (1 - sat);
+      foam.material.alphaMap.offset.x = time * 0.02;
+      foam.visible = foam.material.opacity > 0.01;
+      const fieldTop = Math.max(0.02, v.fieldWaterY);
+      const drop = v.bundH - fieldTop;
+      spill.visible = over > 0.01 && drop > 0.08;
+      if (spill.visible) {
+        spill.position.y = v.bundH + 0.05;
+        spill.scale.y = drop / Math.cos(spill.rotation.x);
+        spill.material.opacity = over * 0.85;
+        spillTex.offset.y = time * 1.6;
+      }
       const flooded = v.fieldWaterY > 0.02;
       fieldWater.mesh.visible = flooded;
       fieldWater.mesh.position.y = Math.max(0.02, v.fieldWaterY);
@@ -474,16 +537,24 @@ export function createWorld(canvas, { mobile = false } = {}) {
     return mesh;
   }
 
-  function water(w, d, sx, sz, color = '#3d6d8c', opacity = 0.9) {
+  function water(w, d, sx, sz, color = '#3d6d8c', opacity = 0.9, ripples = [8, 8]) {
     const g = new THREE.PlaneGeometry(w, d, sx, sz);
     g.rotateX(-Math.PI / 2);
     const base = Float32Array.from(g.attributes.position.array);
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.32, metalness: 0.0, envMapIntensity: 0.38, transparent: true, opacity, depthWrite: opacity > 0.85 });
+    // big slow swell in the vertices, fine ripples in a drifting normal map, sky reflections from the environment
+    const normalMap = waterNormalTexture(ripples);
+    const mat = new THREE.MeshStandardMaterial({
+      color, roughness: 0.22, metalness: 0.0, envMapIntensity: 0.6, normalMap, normalScale: new THREE.Vector2(0.3, 0.3),
+      transparent: true, opacity, depthWrite: opacity > 0.85,
+    });
     const mesh = new THREE.Mesh(g, mat);
+    mesh.receiveShadow = true;
     let last = -1;
     return {
       mesh,
       wave(time, amp) {
+        normalMap.offset.set(time * 0.012, time * 0.007);
+        mat.normalScale.setScalar(0.22 + amp * 0.5);       // choppier in a storm
         if (time - last < 1 / 30) return;     // waves at 30 fps are plenty
         last = time;
         const p = g.attributes.position;
@@ -1056,6 +1127,37 @@ function crackTexture() {
       x.stroke();
     }
   });
+}
+
+function foamTexture() {
+  return canvasTexture(256, 64, (x, w, h) => {
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) {
+      const cx = rand() * w, cy = h * (0.25 + rand() * 0.5), r = 2 + rand() * 7;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(255,255,255,${0.5 + rand() * 0.5})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g;
+      for (const dx of [0, -w, w]) { x.save(); x.translate(dx, 0); x.fillRect(cx - r, cy - r, r * 2, r * 2); x.restore(); }
+    }
+  }, true);
+}
+
+/** Streaks running down a sheet of pouring water (alpha map, scrolled over time). */
+function spillTexture() {
+  const t = canvasTexture(256, 128, (x, w, h) => {
+    x.fillStyle = 'rgb(70,70,70)';
+    x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 140; i++) {
+      const sx = rand() * w, len = 20 + rand() * 70, sy = rand() * h;
+      x.strokeStyle = `rgba(255,255,255,${0.35 + rand() * 0.55})`;
+      x.lineWidth = 1 + rand() * 2.5;
+      for (const dy of [0, -h, h]) { x.beginPath(); x.moveTo(sx, sy + dy); x.lineTo(sx + (rand() - 0.5) * 3, sy + dy + len); x.stroke(); }
+    }
+  }, true);
+  t.repeat.set(10, 1);
+  return t;
 }
 
 // ---------------------------------------------------------------- small helpers

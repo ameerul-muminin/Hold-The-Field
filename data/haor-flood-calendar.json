@@ -1,0 +1,194 @@
+{
+ "id": "haor-flood-calendar",
+ "region": "haor",
+ "source": "NASA POWER Daily API, community AG (PRECTOTCORR)",
+ "point": {
+  "lat": 25.27,
+  "lon": 91.73,
+  "name": "Cherrapunji / Sohra, Meghalaya"
+ },
+ "window": "1 March to 31 May, 3-day rain totals",
+ "thresholdsMm": {
+  "watch": 100,
+  "warning": 150
+ },
+ "missing_values_filled": 0,
+ "fetched": "2026-10-12",
+ "years": [
+  {
+   "year": 2001,
+   "firstWatch": "2001-04-29",
+   "firstWarning": null,
+   "peak3dayMm": 115.0,
+   "peakDate": "2001-04-30"
+  },
+  {
+   "year": 2002,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 90.2,
+   "peakDate": "2002-04-27"
+  },
+  {
+   "year": 2003,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 87.0,
+   "peakDate": "2003-04-01"
+  },
+  {
+   "year": 2004,
+   "firstWatch": "2004-04-15",
+   "firstWarning": null,
+   "peak3dayMm": 104.1,
+   "peakDate": "2004-04-15"
+  },
+  {
+   "year": 2005,
+   "firstWatch": "2005-05-21",
+   "firstWarning": null,
+   "peak3dayMm": 106.8,
+   "peakDate": "2005-05-21"
+  },
+  {
+   "year": 2006,
+   "firstWatch": "2006-05-28",
+   "firstWarning": null,
+   "peak3dayMm": 116.3,
+   "peakDate": "2006-05-28"
+  },
+  {
+   "year": 2007,
+   "firstWatch": "2007-04-24",
+   "firstWarning": null,
+   "peak3dayMm": 106.9,
+   "peakDate": "2007-04-24"
+  },
+  {
+   "year": 2008,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 56.0,
+   "peakDate": "2008-05-22"
+  },
+  {
+   "year": 2009,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 87.8,
+   "peakDate": "2009-04-21"
+  },
+  {
+   "year": 2010,
+   "firstWatch": "2010-04-18",
+   "firstWarning": "2010-04-19",
+   "peak3dayMm": 162.3,
+   "peakDate": "2010-04-19"
+  },
+  {
+   "year": 2011,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 52.6,
+   "peakDate": "2011-05-03"
+  },
+  {
+   "year": 2012,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 83.8,
+   "peakDate": "2012-05-01"
+  },
+  {
+   "year": 2013,
+   "firstWatch": "2013-05-05",
+   "firstWarning": null,
+   "peak3dayMm": 144.0,
+   "peakDate": "2013-05-10"
+  },
+  {
+   "year": 2014,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 97.9,
+   "peakDate": "2014-05-09"
+  },
+  {
+   "year": 2015,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 97.2,
+   "peakDate": "2015-04-20"
+  },
+  {
+   "year": 2016,
+   "firstWatch": "2016-04-16",
+   "firstWarning": "2016-04-16",
+   "peak3dayMm": 232.3,
+   "peakDate": "2016-05-18"
+  },
+  {
+   "year": 2017,
+   "firstWatch": "2017-03-30",
+   "firstWarning": "2017-03-31",
+   "peak3dayMm": 220.9,
+   "peakDate": "2017-04-03"
+  },
+  {
+   "year": 2018,
+   "firstWatch": "2018-04-30",
+   "firstWarning": null,
+   "peak3dayMm": 142.4,
+   "peakDate": "2018-05-26"
+  },
+  {
+   "year": 2019,
+   "firstWatch": "2019-05-01",
+   "firstWarning": "2019-05-04",
+   "peak3dayMm": 200.4,
+   "peakDate": "2019-05-04"
+  },
+  {
+   "year": 2020,
+   "firstWatch": "2020-05-21",
+   "firstWarning": "2020-05-22",
+   "peak3dayMm": 318.2,
+   "peakDate": "2020-05-26"
+  },
+  {
+   "year": 2021,
+   "firstWatch": "2021-05-20",
+   "firstWarning": null,
+   "peak3dayMm": 112.4,
+   "peakDate": "2021-05-20"
+  },
+  {
+   "year": 2022,
+   "firstWatch": "2022-04-01",
+   "firstWarning": "2022-05-12",
+   "peak3dayMm": 263.8,
+   "peakDate": "2022-05-14"
+  },
+  {
+   "year": 2023,
+   "firstWatch": null,
+   "firstWarning": null,
+   "peak3dayMm": 94.7,
+   "peakDate": "2023-03-21"
+  },
+  {
+   "year": 2024,
+   "firstWatch": "2024-05-27",
+   "firstWarning": "2024-05-28",
+   "peak3dayMm": 337.1,
+   "peakDate": "2024-05-29"
+  },
+  {
+   "year": 2025,
+   "firstWatch": "2025-04-24",
+   "firstWarning": "2025-05-20",
+   "peak3dayMm": 357.9,
+   "peakDate": "2025-05-31"
+  }
+ ]
+}

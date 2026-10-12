@@ -9,6 +9,7 @@ import { reportText, reportCsv, download } from './game/report.js';
 import * as audio from './audio.js';
 import { createHud, toast, notice } from './ui/hud.js';
 import * as screens from './ui/screens.js';
+import { fieldScreen } from './ui/field.js';
 
 const $ = (id) => document.getElementById(id);
 const mobile = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700;
@@ -46,6 +47,7 @@ async function boot() {
   showTitleScene(haor);
   hud.setSound(audio.isMuted());
   openTitle();
+  if (location.hash === '#field') openField();     // a shared link opens the farmer tool directly
   document.body.classList.remove('booting');
   requestAnimationFrame(loop);
   // Real data comes from the committed data/*.json (see the nasa-data GitHub Action). Fetching live from NASA POWER
@@ -92,10 +94,15 @@ function openTitle() {
   world.setMode('title');
   screens.titleScreen({
     onPlay: () => { audio.unlock(); audio.sfx.click(); openPrologue(); },
+    onField: () => { audio.unlock(); audio.sfx.click(); openField(); },
     onAbout: () => openAbout(openTitle),
     onAdvancements: () => screens.advancementsScreen({ onClose: openTitle }),
     dataState,
   });
+}
+
+function openField() {
+  fieldScreen({ onClose: () => { if (location.hash === '#field') history.replaceState(null, '', location.pathname + location.search); openTitle(); }, notice });
 }
 
 function openPrologue() {
@@ -344,7 +351,7 @@ function wireInput() {
     const scr = screens.currentScreen();
     if (e.key === 'Escape') {
       if (scr === 'menu') { screens.close(); return; }
-      if (scr === 'dashboard' || scr === 'about') { $('screen').querySelector('#dClose, #aClose')?.click(); return; }
+      if (scr === 'dashboard' || scr === 'about' || scr === 'field') { $('screen').querySelector('#dClose, #aClose, #fClose')?.click(); return; }
       if (satellite) { toggleSatellite(false); return; }
       if (session && !scr) { openMenu(); return; }
       return;

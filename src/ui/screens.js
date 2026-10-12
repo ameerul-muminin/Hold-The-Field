@@ -31,6 +31,7 @@ export function close() {
   const h = host();
   h.innerHTML = '';
   h.className = 'screen-host';
+  delete h.dataset.screen;
 }
 
 /** Re-render the open screen (after a language change). */
@@ -42,7 +43,10 @@ export { mount, langSwitch, wireLang };
 
 function mount(name, html, { scrim = true } = {}) {
   const h = host();
-  h.className = `screen-host${scrim ? ' scrim' : ''}`;
+  // the panel materialises only when the screen first opens, not on every re-render (a click, a language change)
+  const fresh = h.dataset.screen !== name;
+  h.dataset.screen = name;
+  h.className = `screen-host${scrim ? ' scrim' : ''}${fresh ? ' enter' : ''}`;
   h.innerHTML = html;
   h.firstElementChild?.querySelector?.('button.primary, button')?.focus({ preventScroll: true });
   return h;
@@ -69,7 +73,7 @@ export function titleScreen({ onPlay, onField, onAbout, onAdvancements, dataStat
         <h1>${esc(BRAND.nameParts[0])}<span>${esc(BRAND.nameParts[1])}</span></h1>
         <div class="bar"></div>
         <p class="tagline">${T(BRAND.tagline)}</p>
-        <p class="blurb">${T('A farm\'s strategic partner built on real NASA data. The climate raids your farm, and you cannot let it win. Replay a real flash flood or drought, day by day.')}</p>
+        <p class="blurb">${T('A farm\'s strategic partner, built on real NASA data.')}</p>
         <div class="title-menu">
           <button class="btn primary big" id="tPlay">${T('Play')}</button>
           <button class="btn field-btn" id="tField">${T('My field today')}</button>
@@ -138,8 +142,8 @@ export function prologueScreen({ season, cfg, onContinue, onBack, onLine }) {
         <div class="quote-bn" lang="bn">${OPEN_BN[0]}<br>${OPEN_BN[1]}</div>
         <div class="quote-en quote">“${esc(OPEN_EN[0])}<br>${esc(OPEN_EN[1])}”</div>
         <div class="who">${T('Nodi, Hashem\'s daughter, remembering 2017')}</div>
-        <p>${f('You might think Hashem lost his harvest in April. But it was in December, when he chose a rice that needs {} days instead of a {}-day one, which would have been home before the flood had a chance to ruin it.', num(longDays), num(shortDays))}</p>
-        <p class="note">${T('Hashem and Nodi are composite characters based on real haor farmers\' experiences. The rain is real NASA data.')}</p>
+        <p>${f('Hashem lost his harvest in December, choosing a {}-day rice. A {}-day one would have been home before the flood.', num(longDays), num(shortDays))}</p>
+        <p class="note">${T('Composite characters. Real NASA rain.')}</p>
         <div class="panel-foot"><button class="btn" id="pBack">${T('Back')}</button><button class="btn primary" id="pGo">${T('Back to December')}</button></div>
       </section>`);
     h.querySelector('#pGo').onclick = onContinue;
@@ -153,7 +157,7 @@ export function prologueScreen({ season, cfg, onContinue, onBack, onLine }) {
 // ===================================================================== plan the season
 
 // Colour language of the plan screen: terrain colour, Hashem's way = warm (the bad outcome), scout = green (the good one).
-const TONE = { 'haor-2017': '#58a9e8', 'barind-2022': '#e6be4b', coast: '#6fd6cf', hashem: '#ff9a5c', scout: '#5bd18a' };
+const TONE = { 'haor-2017': '#5eb8ff', 'barind-2022': '#ffd60a', coast: '#64e0d6', hashem: '#ff9f45', scout: '#30d158' };
 const toneOf = (id) => TONE[id] || (String(id).includes('satkhira') || String(id).includes('coast') ? TONE.coast : '#8fa3bc');
 // Where the hazard falls in each season, so the planting dates read at a glance. Flood: April 2017 (real). The Barind
 // drought date is not shown: the sample file is not a real measurement.
@@ -184,7 +188,7 @@ export function planScreen({ initial, onStart, onBack }) {
         <span class="days">${f('{} days', num(vv.fieldDays))}</span>
         ${dry ? '' : `<span class="seedline">${f('{} days from seed', num(vv.fieldDays + BRAND.seedbedDays))}</span>`}
         <div class="yield-bar"><i style="width:${vv.potential * 100}%"></i></div>
-        <span>${f('{}% of full yield', Math.round(vv.potential * 100))}</span></button>`;
+        <span>${f('{}% yield', Math.round(vv.potential * 100))}</span></button>`;
     };
     const dateBtn = (o, i) => {
       const plant = o[0], ripe = ripeOf(i);
@@ -194,7 +198,7 @@ export function planScreen({ initial, onStart, onBack }) {
         <div class="strip"><i style="left:${pos(plant)};width:calc(${pos(ripe)} - ${pos(plant)})"></i>${risk ? `<u style="left:${pos(risk.date)}"></u>` : ''}</div>
       </button>`;
     };
-    const note = scout ? t('Watch the scout. Act when it warns.') : t('Rahim plants long rice on the usual date. No warning.');
+    const note = scout ? t('Watch the scout. Act when it warns.') : t('Long rice, usual date, no warning.');
     const h = mount('plan', `
       <section class="card panel plan" style="--w:1000px" role="dialog" aria-label="Plan the Season">
         <h2>${T('Plan the Season')}</h2>
@@ -203,7 +207,7 @@ export function planScreen({ initial, onStart, onBack }) {
         <div class="sec">${T('How you play')}</div>
         <div class="choices cols-2">
           ${modeBtn(MODE_RAHIM, 'hashem', "Rahim's way", 'No warning')}
-          ${modeBtn(MODE_SCOUT, 'scout', 'Scout mode', 'NASA scout on your side')}
+          ${modeBtn(MODE_SCOUT, 'scout', 'Scout mode', 'NASA warns you')}
         </div>
         <div class="plan-grid">
           <div>
@@ -273,7 +277,7 @@ export function dashboardScreen({ session, onClose }) {
       <section class="card panel dashboard" role="dialog" aria-label="NASA Satellite Scout">
         <div class="dash-head">
           <div><h2>${T('NASA Satellite Scout')}</h2>
-          <p class="sub">${esc(date(st.date))}   |   ${f('day {} of {}', st.i + 1, n)}   |   ${T(prov === 'sample' ? 'SAMPLE DATA' : 'NASA POWER')}   |   ${T('hover a chart for values')}</p></div>
+          <p class="sub">${esc(date(st.date))}   |   ${f('day {} of {}', st.i + 1, n)}   |   ${T(prov === 'sample' ? 'SAMPLE DATA' : 'NASA POWER')}</p></div>
           <button class="btn" id="dClose">${T('Close')}</button>
         </div>
         <div class="dash-grid">${charts.map(() => '<div></div>').join('')}</div>
@@ -300,14 +304,14 @@ export function debriefScreen({ session, other, onAgain, onPlan, onReport, onLoo
     const bestNo = best(noWarning), bestScout = best(withScout);
     const planLabel = (p) => `${t(cfg.varieties[p.variety].label)}, ${t(p.label)}`;
     const insights = [];
-    if (sum.leadDays != null) insights.push(f(dry ? 'NASA rain and soil data gave a warning {} day(s) before the crop felt the dry soil.' : 'NASA rain data in the hills gave a warning {} day(s) before the water reached the embankment.', sum.leadDays));
+    if (sum.leadDays === 1) insights.push(t(dry ? 'NASA warned 1 day before the crop felt the drought.' : 'NASA warned 1 day before the water came.'));
+    else if (sum.leadDays != null) insights.push(f(dry ? 'NASA warned {} days before the crop felt the drought.' : 'NASA warned {} days before the water came.', sum.leadDays));
     else if (sum.floodDate) insights.push(t(dry ? 'The dry spell hit without a scout warning ahead of it.' : 'The flood arrived without a scout warning ahead of it.'));
     else insights.push(t(dry ? 'The crop never suffered from dry soil on this plan.' : 'No flood reached the embankment on this plan.'));
-    if (bestNo) insights.push(f('With no warning at all, the best plan keeps {}%: {}.', Math.round(bestNo.yieldPct * 100), planLabel(bestNo)));
-    if (bestScout) insights.push(f('Acting on the scout, the best plan keeps {}%: {}.', Math.round(bestScout.yieldPct * 100), planLabel(bestScout)));
-    if (dry && bestNo && bestScout && bestNo.variety === 'short' && bestScout.variety === 'long') insights.push(t('Without a warning the drought-tolerant variety is the safer choice; with the scout and well-timed irrigation the standard variety wins.'));
-    else if (!dry && bestNo && bestNo.variety === 'short' && bestNo.transplant !== cfg.transplantOptions.at(-1)[0]) insights.push(t('Ripening earlier let the rice come in before the spring water: timing is itself an adaptation.'));
-    else if (bestNo && bestNo.yieldPct < 0.5) insights.push(t('Without a warning, every plan here lost most of the crop: early warning, not the calendar, is what protects the harvest.'));
+    if (dry && bestNo && bestScout && bestNo.variety === 'short' && bestScout.variety === 'long') insights.push(t('No warning: tolerant rice is safer. With the scout: standard rice wins.'));
+    else if (!dry && bestNo && bestNo.variety === 'short' && bestNo.transplant !== cfg.transplantOptions.at(-1)[0]) insights.push(t('Earlier rice beat the water. Timing is adaptation.'));
+    else if (bestNo && bestNo.yieldPct < 0.5) insights.push(t('Without a warning, every plan lost most of the crop.'));
+    else if (bestScout) insights.push(f('Acting on the scout, the best plan keeps {}%: {}.', Math.round(bestScout.yieldPct * 100), planLabel(bestScout)));
 
     const result = (label, y, color) => `<div class="result"><div class="who">${T(label)}</div><div class="pct" style="color:${color}">${f('{}%', Math.round(y * 100))}</div><div class="small faint">${T('of the harvest saved')}</div><div class="bar"><i style="width:${Math.min(1, y) * 100}%;background:${color}"></i></div></div>`;
     const grid = (title, plans) => {
@@ -328,11 +332,9 @@ export function debriefScreen({ session, other, onAgain, onPlan, onReport, onLoo
       ? `<div class="mono">${T('NO ONE IS LISTENING.')}</div><div class="bn" lang="bn">${NODI_BN[1]}</div><div class="en quote">“${esc(NODI_EN[1])}”</div>`
       : saved
         ? `<div class="mono">${T('SOMEONE IS LISTENING.')}</div><div class="bn" lang="bn">${CLOSE_BN}</div><div class="en quote">“${esc(CLOSE_EN)}”</div><div class="now">${T('This time, someone was listening.')}</div>`
-        : `<div class="mono">${T('DECEMBER AGAIN.')}</div><div class="en">${T('The water still came first. Go back to December: a rice that ripens sooner, then act on the warning.')}</div>`;
+        : `<div class="mono">${T('DECEMBER AGAIN.')}</div><div class="en">${T('The water came first. Try a shorter rice, and act on the warning.')}</div>`;
     const p = s.points;
-    const source = f('Data: NASA POWER daily (PRECTOTCORR, T2M_MAX, GWETROOT) · farm {} N {} E{} · {} to {}{}',
-      p.farm.lat.toFixed(2), p.farm.lon.toFixed(2), dry ? '' : f(' · upstream {} N {} E', p.upstream.lat.toFixed(2), p.upstream.lon.toFixed(2)),
-      date(s.days[0].date), date(s.days.at(-1).date), s.sample ? ` · ${t('SAMPLE DATA')}` : '');
+    const source = f('NASA POWER daily data · {} to {}', date(s.days[0].date), date(s.days.at(-1).date)) + (s.sample ? ` · ${t('SAMPLE DATA')}` : '');
 
     const h = mount('debrief', `
       <section class="card panel debrief" role="dialog" aria-label="Season debrief">
@@ -343,10 +345,10 @@ export function debriefScreen({ session, other, onAgain, onPlan, onReport, onLoo
         </div>
         <div class="debrief-grid">
           <div>
-            ${result(rahim ? "Rahim's way (no scout)" : 'You, with the scout', st.yieldPct, COLORS.crop)}
-            ${result(rahim ? 'With the scout' : "Rahim's way (no scout)", other.yieldPct, '#8ab4f0')}
+            ${result(rahim ? "Rahim's way (no scout)" : 'You, with the scout', st.yieldPct, rahim ? TONE.hashem : TONE.scout)}
+            ${result(rahim ? 'With the scout' : "Rahim's way (no scout)", other.yieldPct, rahim ? TONE.scout : TONE.hashem)}
             <div class="label section-label">${T('What the data showed')}</div>
-            <ul class="insights">${[insights[0], insights.length > 1 ? insights.at(-1) : null].filter(Boolean).map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+            <ul class="insights">${insights.slice(0, 2).map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
           </div>
           <div>
             <div id="dbChart" style="height:250px"></div>
@@ -358,7 +360,7 @@ export function debriefScreen({ session, other, onAgain, onPlan, onReport, onLoo
             ${grid('No warning, no action', noWarning)}
             <div style="height:12px"></div>
             ${grid('Acting on the scout', withScout)}
-            <div class="small faint">${T('White outline = your plan')}</div>
+            <div class="small faint">${T('Outlined: your plan')}</div>
           </div>
         </div>
         <div class="panel-foot">
@@ -404,29 +406,26 @@ export function aboutScreen({ seasons, onClose, onRefetch, onUseBundled, fetchin
       const where = t(dry ? 'Barind Tract' : 'Sunamganj haor');
       const farm = f('farm {} N {} E', f2(s.points.farm.lat), f2(s.points.farm.lon));
       const pts = dry ? farm : f('farm {} N {} E, upstream {} N {} E', f2(s.points.farm.lat), f2(s.points.farm.lon), f2(s.points.upstream.lat), f2(s.points.upstream.lon));
-      let data = f('NASA POWER Daily API (community AG): precipitation (PRECTOTCORR), maximum temperature (T2M_MAX) and root-zone soil wetness (GWETROOT), {} to {}. Points: {} ({}).',
-        s.days[0].date, s.days.at(-1).date, pts, t(dry ? 'the Barind Tract in north-western Bangladesh' : 'Sunamganj haor and the Meghalaya hills above it'));
+      let data = f('NASA POWER daily: rain (PRECTOTCORR), heat (T2M_MAX), soil wetness (GWETROOT). {} to {}. {}.', date(s.days[0].date), date(s.days.at(-1).date), pts);
       const prov = provenance(s);
-      data += '\n' + (prov === 'sample' ? t('THIS COPY IS SAMPLE DATA, NOT REAL. Press the button below to load the real season from NASA POWER in this browser.')
-        : prov === 'live' ? f('Fetched live from NASA POWER in this browser on {}.', date(s.fetched.slice(0, 10))) : t('Real NASA POWER data committed to the repository.'));
-      blocks.push([f('Where the data comes from: {}', where), data, s.id, prov]);
+      data += '\n' + (prov === 'sample' ? t('SAMPLE DATA, not real. Load the real season below.')
+        : prov === 'live' ? f('Fetched live from NASA POWER in this browser on {}.', date(s.fetched.slice(0, 10))) : t('Real NASA POWER data.'));
+      blocks.push([f('Data: {}', where), data, s.id, prov]);
       const sv = c.varieties.short, lv = c.varieties.long;
       const model = dry
-        ? [f('The soil is a simple store: NASA\'s root-zone wetness plus any irrigation you add, which fades over a few days. The rice is stressed whenever that wetness falls below its stress line ({} for standard, {} for drought-tolerant).', f2(lv.stressSoil), f2(sv.stressSoil)),
-          f('Stress piles up on dry days, fastest during flowering and grain filling, and more when it is hotter than {} C. The crop fails when stress reaches 100%; otherwise the harvest is reduced by the stress it has collected.', c.heatC),
-          f('The satellite scout warns from the rain of the last 7 days and today\'s soil wetness: Watch under {} mm of rain, Drought Warning under {} mm.', c.dryWatchMm, c.dryWarnMm),
-          f("Irrigating costs Tk {} and one load from the village tank ({} loads at most; rain refills it). Rice matures linearly after transplanting ({} days drought-tolerant, {} standard). You may harvest from {}% maturity. Yield = maturity x the variety's potential ({}% tolerant, {}% standard) x what the stress leaves; game parameters, not agronomic advice.",
-            c.irrigationCost, c.tankMax, sv.fieldDays, lv.fieldDays, c.minHarvestMaturity * 100, Math.round(sv.potential * 100), Math.round(lv.potential * 100))]
-        : [f('Water level is a simple bucket, in metres above the field: rain in the hills upstream (arriving {} days later) and rain on the farm fill it, drainage empties it.', c.lagDays),
-          f('A flash flood starts when the water rises above the embankment ({} m, +{} m per raise, up to {} raises). The crop dies after {} days under water.', c.bundStart, c.bundRaise, c.maxBundRaises, c.daysUnderwaterToKill),
-          f('The satellite scout warns from the 3-day total of upstream rain: Watch at {} mm, Flood Warning at {} mm.', c.watchMm, c.warningMm),
-          f("Rice matures linearly after transplanting ({} days for short-duration, {} for long-duration). You may harvest from {}% maturity. Yield = maturity x the variety's potential ({}% for short, {}% for long; game parameters, not agronomic advice).",
-            sv.fieldDays, lv.fieldDays, c.minHarvestMaturity * 100, Math.round(sv.potential * 100), Math.round(lv.potential * 100))];
-      blocks.push([f('How the model works: {}', where), model.join('\n')]);
+        ? [f('Soil = NASA root-zone wetness plus your irrigation. Below the stress line ({} standard, {} tolerant) the rice suffers.', f2(lv.stressSoil), f2(sv.stressSoil)),
+          f('Stress builds on dry days, most at flowering and above {} C. At 100% the crop fails.', c.heatC),
+          f('Scout: 7-day rain and soil. Watch under {} mm, warning under {} mm.', c.dryWatchMm, c.dryWarnMm),
+          f('Irrigation: Tk {} and one tank load ({} at most). Rice ripens in {} or {} days; harvest from {}%. Game numbers, not advice.', c.irrigationCost, c.tankMax, sv.fieldDays, lv.fieldDays, c.minHarvestMaturity * 100)]
+        : [f('Water is one bucket: hill rain arrives {} days later, farm rain adds, drainage empties.', c.lagDays),
+          f('Flood when water tops the embankment ({} m, +{} m per raise). The crop dies after {} days under.', c.bundStart, c.bundRaise, c.daysUnderwaterToKill),
+          f('Scout: 3-day hill rain. Watch at {} mm, warning at {} mm.', c.watchMm, c.warningMm),
+          f('Rice ripens in {} or {} days; harvest from {}%. Game numbers, not advice.', sv.fieldDays, lv.fieldDays, c.minHarvestMaturity * 100)];
+      blocks.push([f('Model: {}', where), model.join('\n')]);
     }
-    blocks.push([t('What it leaves out, on purpose'), t('One bucket for the whole field, or one soil layer: no river routing, terrain, embankment failure, groundwater, canals or pumps. Rain from a single point stands in for the whole catchment or district. Crop growth is linear: no fertiliser, pests or disease.\nIt is a learning game calibrated to one real event per scenario, not a forecast.')]);
-    blocks.push([t('How to play'), t('Drag to look around, scroll or pinch to zoom. Space starts and pauses time; + and - change the speed. 1: raise the embankment, or irrigate in the drought scenario. 2: harvest (from 80% maturity). 3 or M: NASA satellite view. 4 or E: scout dashboard. Click Rahim to hear what he thinks. Esc opens the menu.')]);
-    blocks.push([t('Rahim'), t("Rahim is a composite character based on real haor farmers' experiences. The seasons are real; his story stands in for many.")]);
+    blocks.push([t('What it leaves out'), t('One field, one point of rain, linear growth. A learning game set on one real event, not a forecast.')]);
+    blocks.push([t('How to play'), t('Drag to look, scroll to zoom. Space: play or pause. + and -: speed. 1: bund or irrigate. 2: harvest. 3: satellite. 4: dashboard. Click Rahim to talk. Esc: menu.')]);
+    blocks.push([t('Rahim'), t('A composite of real haor farmers. The seasons are real.')]);
     blocks.push([t('Team Anthropocene'), t('Alif, Safwat, Yasin, Zawad, Yaminur and Marwa. NASA Space Apps Challenge 2026, Chattogram, Bangladesh. Challenge: Field Shift. Data: NASA POWER. Every model, texture and sound in this game is generated by code.')]);
 
     const h = mount('about', `

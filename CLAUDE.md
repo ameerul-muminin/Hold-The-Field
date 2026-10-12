@@ -5,7 +5,7 @@ Web build: static ES modules, no build step, three.js vendored in vendor/. Live:
 Branch to work on: `agrocene-web` (fork: ameerul-muminin/Hold-The-Field). Org repo main only changes when PR #2 is merged.
 
 ## Hard rules
-- Do NOT change game logic: src/sim/*, src/game/session.js. Numbers must stay in step with the Java desktop build (game/). `node --test` must stay at 24 passing.
+- Do NOT change game logic: src/sim/*, src/game/session.js. Numbers must stay in step with the Java desktop build (game/). `node --test`: the 24 sim tests (src/sim/engine.test.js) must keep passing; src/field/advice.test.js adds 6 more (30 in all).
 - Display name is Hashem (code and shared Bengali files still say "Rahim"; persona() in src/i18n.js maps it). Nodi is his daughter.
 - Every new English string needs a Bengali entry in lang/bn-web.txt ("English => বাংলা"). Mark unreviewed Bengali; a native speaker must review.
 - Video script rules: no under-18 faces/names/voices; subtitles on every line; the video is under 240 s.

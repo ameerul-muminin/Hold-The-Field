@@ -26,3 +26,15 @@ python3 data-pipeline/fetch_power.py --region barind --start 20220625 --end 2022
 `data/barind-2022.json` in the repo is a labelled SAMPLE made by `make_sample_barind.py` (a monsoon, then a three-week dry
 spell). It is not the weather of 2022. When you fetch the real file, look at the debrief: if that season was not dry,
 pick a different date range for the scenario.
+
+## Flood calendar (for "My field today")
+
+The farmer tool's harvest planner uses 25 years of NASA POWER rain in the Meghalaya hills: for each spring it records the
+first day the 3-day rain total reached the scout's WATCH (100 mm) and FLOOD WARNING (150 mm) levels.
+
+```bash
+python3 data-pipeline/fetch_flood_calendar.py --out data/haor-flood-calendar.json
+```
+
+2017 comes out as the earliest warning-level spring in the record (31 March), the same day as the game's FLOOD WARNING.
+The live cards on that screen (rain, soil, heat, cold, damp) call NASA POWER from the browser and need no file.

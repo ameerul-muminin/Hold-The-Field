@@ -36,6 +36,10 @@ export function close() {
 /** Re-render the open screen (after a language change). */
 export function refresh() { current?.render(); }
 
+/** Open a screen that lives in its own module (ui/field.js): render() mounts and wires it. */
+export function open(name, render) { current = { name, render }; render(); }
+export { mount, langSwitch, wireLang };
+
 function mount(name, html, { scrim = true } = {}) {
   const h = host();
   h.className = `screen-host${scrim ? ' scrim' : ''}`;
@@ -53,7 +57,7 @@ function wireLang(h) {
 
 // ===================================================================== title
 
-export function titleScreen({ onPlay, onAbout, onAdvancements, dataState }) {
+export function titleScreen({ onPlay, onField, onAbout, onAdvancements, dataState }) {
   const render = () => {
     const ds = dataState();
     const badge = ds === 'fetching' ? t('Fetching NASA POWER data…')
@@ -68,6 +72,7 @@ export function titleScreen({ onPlay, onAbout, onAdvancements, dataState }) {
         <p class="blurb">${T('A farm\'s strategic partner built on real NASA data. The climate raids your farm, and you cannot let it win. Replay a real flash flood or drought, day by day.')}</p>
         <div class="title-menu">
           <button class="btn primary big" id="tPlay">${T('Play')}</button>
+          <button class="btn field-btn" id="tField">${T('My field today')}</button>
           <button class="btn" id="tAbout">${T('Data & Model')}</button>
           <button class="btn" id="tAdv">${T('Advancements')}</button>
         </div>
@@ -78,6 +83,7 @@ export function titleScreen({ onPlay, onAbout, onAdvancements, dataState }) {
       </div>`, { scrim: false });
     wireLang(h);
     h.querySelector('#tPlay').onclick = onPlay;
+    h.querySelector('#tField').onclick = onField;
     h.querySelector('#tAbout').onclick = onAbout;
     h.querySelector('#tAdv').onclick = onAdvancements;
   };

@@ -133,3 +133,29 @@ export const frondTexture = () => make('frond', 128, (x, s) => {
 }, { srgb: false });
 
 void noise2;
+
+/** Tileable ripple normal map for water (linear data, not colour). Scrolled over time by the water material. */
+export const waterNormalTexture = (repeat) => make('waterNormal', 256, (x, s) => {
+  // a sum of waves with whole-number frequencies tiles exactly and keeps the same texture everywhere (no tile grid)
+  const waves = [];
+  for (let k = 0; k < 28; k++) {
+    let fx = Math.round((rand() - 0.5) * 16), fy = Math.round((rand() - 0.5) * 16);
+    if (!fx && !fy) fx = 1;
+    waves.push([fx, fy, rand() * Math.PI * 2, 1 / Math.hypot(fx, fy)]);
+  }
+  const img = x.createImageData(s, s), k = 0.55;
+  for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+    const u = i / s, v = j / s;
+    let dx = 0, dy = 0;
+    for (const [fx, fy, ph, a] of waves) {
+      const c = Math.cos(2 * Math.PI * (fx * u + fy * v) + ph) * a;      // derivative of a*sin(...)
+      dx += c * fx; dy += c * fy;
+    }
+    let nx = -dx * k / 6, ny = -dy * k / 6, nz = 1;
+    const l = Math.hypot(nx, ny, nz);
+    nx /= l; ny /= l; nz /= l;
+    const o = (j * s + i) * 4;
+    img.data[o] = (nx * 0.5 + 0.5) * 255; img.data[o + 1] = (ny * 0.5 + 0.5) * 255; img.data[o + 2] = (nz * 0.5 + 0.5) * 255; img.data[o + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+}, { repeat, srgb: false });

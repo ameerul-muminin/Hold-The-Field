@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { noise2, fbm, ridged, rand } from './noise.js';
 import { grassTexture, mudTexture, earthTexture, hillTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
 import { buildVillage, HOME, POND } from './village.js';
+import { patchwork, treeline } from './landscape.js';
 
 export const VS = 1.6;                       // vertical scale: 1 m of water or rice = 1.6 world units
 const FW = 48, FD = 32;                      // rice field size (world units), centred on the origin
@@ -191,8 +192,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
     }
     target.pose = !st.alive ? 'sad' : st.harvested && st.yieldPct > 0.4 ? 'cheer' : st.status === 'warning' && !st.harvested ? 'warn' : 'idle';
     sacks.set(st.harvested && st.alive ? Math.round(st.yieldPct * 14) : 0);
-    // satellite overlay colours
+    // satellite overlay colours; the neighbours' plots follow the season
     if (parts.setOverlay) parts.setOverlay(day, st, data);
+    if (parts.fields && data?.days?.length) parts.fields.setSeason(st.i / (data.days.length - 1));
   }
 
   function burst(kind) {
@@ -360,6 +362,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
       if (y < -0.6) c.setRGB(0.3, 0.33, 0.27);
     });
     group.add(ground);
+    out.fields = patchwork(ground.material);
+    const horizon = treeline({ full: false });
+    group.add(horizon);
     // the Meghalaya hills upstream
     const hills = terrain(1800, 520, mobile ? 140 : 240, (x, z) => {
       const rise = smooth(130, -60, z);                  // local z: +260 is the near (south) edge
@@ -402,8 +407,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     group.add(soil);
     const bund = makeBund(1.7, false);
     group.add(bund.group);
-    neighbours(group, plots, '#7ea54a');
-    const village = buildVillage(group, { flood: true, mobile });
+    const village = buildVillage(group, { flood: true, mobile, clear: (x, z, r) => clearOfFarm(x, z, r, plots) });
     out.sackOffset = village.sackOffset;
     trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
     const boat = makeBoat();
@@ -427,6 +431,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     };
     out.update = (time, dt, v, sat) => {
       village.update(time, dt, v);
+      horizon.visible = sat < 0.3;
       lake.mesh.position.y = v.lakeY;
       lake.wave(time, 0.12 + v.storm * 0.25);
       // water against the bund: foam once it touches, a pouring sheet once it is over the top
@@ -477,6 +482,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
       c.setRGB(0.54 + g * 0.08 + dryPatch * 0.08, 0.5 + g * 0.07, 0.3 + g * 0.05);
     });
     group.add(ground);
+    out.fields = patchwork(ground.material);
+    const horizon = treeline({ full: true });
+    group.add(horizon);
     const soil = new THREE.Mesh(new THREE.PlaneGeometry(FW, FD), new THREE.MeshLambertMaterial({ color: PAL.soilWet, map: mudTexture([6, 4]) }));
     soil.rotation.x = -Math.PI / 2;
     soil.position.y = 0.01;
@@ -493,8 +501,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const bund = makeBund(0.9, true);
     bund.setHeight(0.32);
     group.add(bund.group);
-    const nb = neighbours(group, plots, '#8aa04a');
-    const village = buildVillage(group, { flood: false, mobile });
+    const village = buildVillage(group, { flood: false, mobile, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14 });
     out.sackOffset = village.sackOffset;
     trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
     // the village tank
@@ -512,11 +519,11 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const lush = new THREE.Color('#b9d98a'), parched = new THREE.Color('#ffffff');
     out.update = (time, dt, v, sat) => {
       village.update(time, dt, v);
+      horizon.visible = sat < 0.3;
       ground.material.color.copy(lush).lerp(parched, v.dryness);
       soil.material.color.copy(v.soil);
       cracks.material.opacity = Math.max(0, v.dryness - 0.15) * 1.0;
       sheen.material.opacity = Math.max(0, (v.moisture - 0.62) * 1.6);
-      for (const m of nb) m.material.color.copy(new THREE.Color('#8aa04a').lerp(new THREE.Color('#b8a06a'), v.dryness * 0.8));
       tank.setLevel(v.tankFrac, time);
       const o = Math.max(0, sat - 0.2) / 0.8;
       soilLayer.visible = pinFarm.visible = o > 0.01;
@@ -598,20 +605,6 @@ export function createWorld(canvas, { mobile = false } = {}) {
       meshes.push(m);
     }
     return { group, setHeight: (h) => { for (const m of meshes) m.scale.y = Math.max(0.05, h); } };
-  }
-
-  function neighbours(group, rects, color) {
-    const tex = rowsTexture();
-    const out = [];
-    for (const [x, z, w, d] of rects) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color, map: tex }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(x, 0.0, z);
-      m.receiveShadow = true;
-      group.add(m);
-      out.push(m);
-    }
-    return out;
   }
 
   function trees(group, n, ok, dry = false) {
@@ -1049,17 +1042,6 @@ function radialTexture() {
   });
 }
 
-function rowsTexture() {
-  return canvasTexture(128, 128, (x, w, h) => {
-    x.fillStyle = '#ffffff';
-    x.fillRect(0, 0, w, h);
-    for (let y = 0; y < h; y += 6) {
-      x.fillStyle = `rgba(40,60,20,${0.25 + rand() * 0.15})`;
-      x.fillRect(0, y, w, 2);
-    }
-  }, true);
-}
-
 function crackTexture() {
   return canvasTexture(512, 512, (x, w, h) => {
     x.clearRect(0, 0, w, h);
@@ -1134,6 +1116,16 @@ function flatMask(x, z, plots) {
     m = Math.max(m, 1 - smooth(0, 5, Math.hypot(dx, dz)));
   }
   return m;
+}
+
+/** Room for a neighbouring homestead: off the field, the farm's homestead, the plots, the power line and the camera spots. */
+function clearOfFarm(x, z, r, plots) {
+  const m = r + 8;
+  if (Math.abs(x) < FW / 2 + 12 + m && Math.abs(z) < FD / 2 + 12 + m) return false;
+  if (x > 18 - m && x < 66 + m && z > -18 - m && z < 42 + m) return false;
+  if (Math.abs(x + 34) < 6 + m && z > -16 - m && z < 76 + m) return false;
+  if (Math.hypot(x - 44, z - 52) < 40 + r || Math.hypot(x - 60, z - 70) < 36 + r) return false;
+  return !plots.some(([px, pz, w, d]) => Math.abs(x - px) < w / 2 + m && Math.abs(z - pz) < d / 2 + m);
 }
 
 function nearPlot(x, z, plots) {

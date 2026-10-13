@@ -14,7 +14,7 @@ const smooth = (e0, e1, v) => { const t = Math.max(0, Math.min(1, (v - e0) / (e1
 const MAT = (o) => new THREE.MeshLambertMaterial(o);
 
 /** Builds the village into group. Returns { update(time, dt, view), sackOffset }. */
-export function buildVillage(group, { flood, mobile }) {
+export function buildVillage(group, { flood, mobile, clear = () => true }) {
   const H = HOME.h, top = (o) => { o.position.y += H; return o; };
   const shadows = (o) => { o.traverse?.((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
   const updates = [];
@@ -57,6 +57,9 @@ export function buildVillage(group, { flood, mobile }) {
   // ---------------------------------------------------------------- pond with a ghat (haor), power line
   if (flood) group.add(pond());
   group.add(powerLine(-34, -10, 70, 14));
+
+  // ---------------------------------------------------------------- neighbouring homesteads: tree clumps across the plots
+  group.add(groves({ flood, mobile, clear }));
 
   // ---------------------------------------------------------------- the haor beyond, or the Barind's palmyra rows
   if (flood) {
@@ -527,6 +530,72 @@ function islands(mobile) {
   const cap = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.4, 8), dome);
   cap.position.set(mx + 12.5, mg + 9.7, mz + 8.5);
   g.add(hall, dm, minaret, cap);
+  return g;
+}
+
+/**
+ * Other homesteads across the land: each a low mound under a dense clump of trees (mango, jackfruit, rain trees),
+ * a few palms above the canopy and tin roofs at the edge. clear(x, z) says where one may stand.
+ */
+function groves({ flood, mobile, clear }) {
+  const want = mobile ? 16 : 34, spots = [];
+  for (let guard = 0; spots.length < want && guard < 4000; guard++) {
+    const a = rand() * Math.PI * 2, d = 90 + Math.sqrt(rand()) * 430;
+    const x = Math.cos(a) * d, z = Math.sin(a) * d + 20, r = 12 + rand() * 14;
+    if (flood && z < -6) continue;                                      // the haor lake is to the north
+    if (!clear(x, z, r)) continue;
+    if (spots.some(([sx, sz, sr]) => Math.hypot(x - sx, z - sz) < r + sr + 14)) continue;
+    spots.push([x, z, r]);
+  }
+  const g = new THREE.Group();
+  const moundG = new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const mounds = new THREE.InstancedMesh(moundG, MAT({ color: flood ? '#4f6a33' : '#6b6a3a', map: grassTexture([6, 6]) }), spots.length);
+  const crownG = new THREE.IcosahedronGeometry(1, 1);
+  const cp = crownG.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < cp.count; i++) {
+    v.fromBufferAttribute(cp, i);
+    v.multiplyScalar(1 + (fbm(v.x * 1.5 + 5, v.y * 1.5 + v.z, 2) - 0.5) * 0.45);
+    v.y *= 0.8;
+    cp.setXYZ(i, v.x, v.y, v.z);
+  }
+  crownG.computeVertexNormals();
+  const perGrove = (r) => Math.round(r * (mobile ? 0.6 : 0.95));
+  const nCrowns = spots.reduce((n, [, , r]) => n + perGrove(r), 0);
+  const crowns = new THREE.InstancedMesh(crownG, MAT({ color: '#2f6a2c' }), nCrowns);
+  const wallsG = new THREE.BoxGeometry(1, 1, 1);
+  wallsG.translate(0, 0.5, 0);
+  const roofG = new THREE.CylinderGeometry(1, 1, 1, 3);
+  roofG.rotateZ(Math.PI / 2);
+  roofG.rotateX(-Math.PI / 2);
+  const nHouses = spots.length * 2;
+  const walls = new THREE.InstancedMesh(wallsG, MAT({ color: '#ffffff' }), nHouses);
+  const roofs = new THREE.InstancedMesh(roofG, new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.25, roughness: 0.6 }), nHouses);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+  const roofCols = ['#8a9298', '#7f888d', '#9a6a48', '#6f8a7a', '#a0a6aa'], wallCols = flood ? ['#b9a07c', '#9aa2a7', '#c8b48e'] : ['#b07a52', '#a86f48', '#c08a5c'];
+  const palms = [];
+  let ci = 0, hi = 0;
+  spots.forEach(([x, z, r], si) => {
+    mounds.setMatrixAt(si, m.compose(p.set(x, -0.6, z), q.identity(), sc.set(r * 1.1, 1.9, r * 0.85)));
+    for (let k = 0; k < perGrove(r); k++) {
+      const a = rand() * 6.28, d = Math.sqrt(rand()) * r * 0.85, tr = 2.6 + rand() * 3.8, tall = rand() < 0.15 ? 1.6 : 1;
+      const tx = x + Math.cos(a) * d, tz = z + Math.sin(a) * d * 0.8;
+      crowns.setMatrixAt(ci, m.compose(p.set(tx, 1 + tr * 0.9 * tall + rand() * 2, tz), q.setFromAxisAngle(up, rand() * 6.28), sc.set(tr, tr * 0.9 * tall, tr)));
+      crowns.setColorAt(ci++, c.setHSL(0.25 + rand() * 0.08, 0.45, 0.3 + rand() * 0.12));
+    }
+    for (let k = 0; k < 2 + Math.floor(rand() * 2); k++) palms.push([x + (rand() - 0.5) * r * 1.2, 0.3, z + (rand() - 0.5) * r]);
+    for (let k = 0; k < 2; k++) {                                       // houses peep out at the edge of the clump
+      const a = rand() * 6.28, d = r * (0.75 + rand() * 0.2);
+      const hx = x + Math.cos(a) * d, hz = z + Math.sin(a) * d * 0.8;
+      const w = 4.5 + rand() * 2, dd = 3.2 + rand();
+      q.setFromAxisAngle(up, rand() * 3.14);
+      walls.setMatrixAt(hi, m.compose(p.set(hx, 0, hz), q, sc.set(w, 2.5, dd)));
+      walls.setColorAt(hi, c.set(wallCols[(si + k) % wallCols.length]));
+      roofs.setMatrixAt(hi, m.compose(p.set(hx, 2.5 + 0.6, hz), q, sc.set(w + 0.6, 1.2, dd * 0.75)));
+      roofs.setColorAt(hi++, c.set(roofCols[(si * 2 + k) % roofCols.length]));
+    }
+  });
+  mounds.receiveShadow = true;
+  g.add(mounds, crowns, walls, roofs, betelPalms(palms, mobile));
   return g;
 }
 

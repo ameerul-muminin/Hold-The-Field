@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { fbm, noise2, rand } from './noise.js';
 import { grassTexture, earthTexture, thatchTexture, plasterTexture, frondTexture, tinTexture, waterNormalTexture } from './textures.js';
+import { harvestCrew } from './harvest.js';
 
 export const HOME = { x: 41, z: 6, w: 26, d: 24, h: 0.7 };      // homestead mound (top), east of the field
 export const POND = { x: 38, z: 28, r: 5.5 };     // south of the mound, in front of the default camera
@@ -39,6 +40,9 @@ export function buildVillage(group, { flood, mobile }) {
   for (const [x, z, s] of [[29.8, -4.4, 1], [30.4, 3, 0.85]]) group.add(shadows(top(haystack(x, z, s))));
   group.add(shadows(top(tubeWell(45.5, 8.8))));
   group.add(top(dryingMat(36.4, 2.4)));
+  const crew = harvestCrew({ mobile, H });          // appears once the rice is cut
+  group.add(crew.group);
+  updates.push(crew.update);
 
   // ---------------------------------------------------------------- plants of the homestead
   const bananas = [[52.5, 13.5], [53, 9.5], [52, 17.4], [29, 15.5], [28.8, 10.5], [52.5, -4.5], [47.5, -5.2]];

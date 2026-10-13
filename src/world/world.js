@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { noise2, fbm, ridged, rand } from './noise.js';
-import { grassTexture, mudTexture, earthTexture, hillTexture, thatchTexture, plasterTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
+import { grassTexture, mudTexture, earthTexture, hillTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
+import { buildVillage, HOME, POND } from './village.js';
 
 export const VS = 1.6;                       // vertical scale: 1 m of water or rice = 1.6 world units
 const FW = 48, FD = 32;                      // rice field size (world units), centred on the origin
@@ -141,6 +142,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     root.clear();
     for (const p of Object.values(parts)) p.dispose?.();
     parts = hz === 'drought' ? buildDrought(root) : buildFlood(root);
+    sacks.group.position.copy(parts.sackOffset ?? new THREE.Vector3());
     view.lakeY = target.lakeY = -0.5;
     view.fieldWaterY = target.fieldWaterY = -0.4;
     sacks.set(0);
@@ -335,7 +337,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   }
   const anchors = () => ({ farm: new THREE.Vector3(0, 3, 0), upstream: UP_POINT.clone() });
 
-  return { setScenario, setState, setMode, resetCamera, frame, resize, degrade, pickRahim, project, anchors, burst, get mode() { return mode; } };
+  /** Fly the camera to a shot (test hook and screen recording). */
+  const shot = (pos, tgt, instant = false) => flyTo(new THREE.Vector3(...pos), new THREE.Vector3(...tgt), 1.4, instant);
+  return { setScenario, setState, setMode, resetCamera, frame, resize, degrade, pickRahim, project, anchors, burst, shot, get mode() { return mode; } };
 
   // ================================================================= scenario builders
 
@@ -343,9 +347,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const out = {};
     // ground: lowland around the field, lake bed to the north
     const plots = [[-62, 4, 36, 30], [62, 34, 30, 24], [-10, 44, 40, 22]];
+    const flats = [...plots, [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8], [POND.x, POND.z, 16, 16]];
     const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
       const lake = smooth(LAKE_EDGE + 1, LAKE_EDGE - 7, z);
-      const flat = flatMask(x, z, plots);
+      const flat = flatMask(x, z, flats);
       const base = 0.1 + fbm(x * 0.02, z * 0.02, 3) * 0.7;
       return (base * (1 - flat) - 0.1 * flat) * (1 - lake) + (-3.2 + fbm(x * 0.01, z * 0.01, 2)) * lake;
     }, (x, z, y, c) => {
@@ -397,8 +402,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const bund = makeBund(1.7, false);
     group.add(bund.group);
     neighbours(group, plots, '#7ea54a');
-    group.add(makeHut(FW / 2 + 12, 9));
-    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 26, -14, 52, 30) && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
+    const village = buildVillage(group, { flood: true, mobile });
+    out.sackOffset = village.sackOffset;
+    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
     const boat = makeBoat();
     boat.position.set(-30, -0.5, LAKE_EDGE - 30);
     group.add(boat);
@@ -419,6 +425,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
       soilLayer.material.color.copy(new THREE.Color('#c09040').lerp(new THREE.Color('#1a59d9'), day.soil));
     };
     out.update = (time, dt, v, sat) => {
+      village.update(time, dt, v);
       lake.mesh.position.y = v.lakeY;
       lake.wave(time, 0.12 + v.storm * 0.25);
       // water against the bund: foam once it touches, a pouring sheet once it is over the top
@@ -459,7 +466,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
   function buildDrought(group) {
     const out = {};
     const plots = [[-60, 2, 36, 30], [60, 36, 30, 24], [-8, 46, 42, 22], [8, -48, 46, 28]];
-    const flats = [...plots, [-36, 27, 16, 16]];          // + the village tank
+    const flats = [...plots, [-36, 27, 16, 16], [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8]];          // + the village tank and the homestead
     const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
       const flat = flatMask(x, z, flats);
       return (0.1 + fbm(x * 0.015, z * 0.015, 3) * 1.4) * (1 - flat) - 0.1 * flat;
@@ -486,8 +493,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
     bund.setHeight(0.32);
     group.add(bund.group);
     const nb = neighbours(group, plots, '#8aa04a');
-    group.add(makeHut(FW / 2 + 12, 9));
-    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 26, -14, 56, 36) && !inRect(x, z, -46, 16, -26, 38) && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
+    const village = buildVillage(group, { flood: false, mobile });
+    out.sackOffset = village.sackOffset;
+    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
     // the village tank
     const tank = makeTank();
     tank.group.position.set(-36, 0, 27);
@@ -502,6 +510,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     };
     const lush = new THREE.Color('#b9d98a'), parched = new THREE.Color('#ffffff');
     out.update = (time, dt, v, sat) => {
+      village.update(time, dt, v);
       ground.material.color.copy(lush).lerp(parched, v.dryness);
       soil.material.color.copy(v.soil);
       cracks.material.opacity = Math.max(0, v.dryness - 0.15) * 1.0;
@@ -602,64 +611,6 @@ export function createWorld(canvas, { mobile = false } = {}) {
       out.push(m);
     }
     return out;
-  }
-
-  function makeHut(x, z) {
-    const g = new THREE.Group();
-    const wallM = new THREE.MeshLambertMaterial({ color: '#c49a6a', map: plasterTexture([2, 1]) });
-    const thatchM = new THREE.MeshLambertMaterial({ color: '#d8b46a', map: thatchTexture([3, 1.5]), side: THREE.DoubleSide });
-    const woodM = new THREE.MeshLambertMaterial({ color: '#6b4a2e' });
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 6.6), new THREE.MeshLambertMaterial({ color: '#9b7a55', map: earthTexture([3, 2]) }));
-    plinth.position.y = 0.25;
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 4.4), wallM);
-    walls.position.y = 1.8;
-    // gabled thatch roof: two sloping slabs and mud gables, ridge along x
-    const pitch = 0.62, half = 3.2, slabW = 8.2;
-    for (const side of [-1, 1]) {
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(slabW, 0.28, half * 1.08), thatchM);
-      slab.position.set(0, 3.1 + Math.sin(pitch) * half / 2, side * Math.cos(pitch) * half / 2);
-      slab.rotation.x = side * pitch;
-      slab.castShadow = true;
-      g.add(slab);
-    }
-    const gable = new THREE.Shape();
-    gable.moveTo(-2.2, 0); gable.lineTo(2.2, 0); gable.lineTo(0, 1.75); gable.closePath();
-    for (const side of [-1, 1]) {
-      const gm = new THREE.Mesh(new THREE.ShapeGeometry(gable), wallM);
-      gm.position.set(side * 3.0, 3.1, 0);
-      gm.rotation.y = side * Math.PI / 2;
-      g.add(gm);
-    }
-    // veranda posts, door, window
-    for (const pz of [-2.9, 2.9]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 2.9, 8), woodM);
-      post.position.set(-3.7, 1.95, pz);
-      post.castShadow = true;
-      g.add(post);
-    }
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.9), new THREE.MeshLambertMaterial({ color: '#3d2a1b' }));
-    door.position.set(-3.01, 1.45, 0.6);
-    door.rotation.y = -Math.PI / 2;
-    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshLambertMaterial({ color: '#2b2219' }));
-    win.position.set(-3.01, 2.0, -1.3);
-    win.rotation.y = -Math.PI / 2;
-    walls.castShadow = walls.receiveShadow = plinth.receiveShadow = true;
-    g.add(plinth, walls, door, win);
-    // haystacks (smooth, with a thatch grain)
-    const hayM = new THREE.MeshLambertMaterial({ color: '#e0bf6a', map: thatchTexture([2, 1]) });
-    for (const [hx, hz, sc] of [[6, -3, 1], [7.4, 1.5, 0.8]]) {
-      const pts = [];
-      for (let k = 0; k <= 10; k++) { const v = k / 10; pts.push(new THREE.Vector2(1.5 * Math.sin(Math.acos(v * 0.98)) * (1 - v * 0.15), v * 3.0)); }
-      const hay = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), hayM);
-      hay.position.set(hx, 0, hz);
-      hay.scale.setScalar(sc);
-      hay.castShadow = true;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 6), woodM);
-      pole.position.set(hx, 3.0 * sc + 0.3, hz);
-      g.add(hay, pole);
-    }
-    g.position.set(x, 0, z);
-    return g;
   }
 
   function trees(group, n, ok, dry = false) {

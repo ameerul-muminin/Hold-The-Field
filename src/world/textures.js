@@ -159,3 +159,23 @@ export const waterNormalTexture = (repeat) => make('waterNormal', 256, (x, s) =>
   }
   x.putImageData(img, 0, 0);
 }, { repeat, srgb: false });
+
+/** Corrugated tin sheet (ridges run along v), weathered with rust streaks; tinted per roof. */
+export const tinTexture = (repeat) => make('tin', 128, (x, s) => {
+  const img = x.createImageData(s, s);
+  for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+    const ridge = 0.78 + 0.22 * Math.sin((i / s) * Math.PI * 2 * 10);
+    const grime = 0.9 + 0.1 * fbm(i * 0.05, j * 0.02, 2);
+    const o = (j * s + i) * 4, g = 255 * ridge * grime;
+    img.data[o] = g; img.data[o + 1] = g; img.data[o + 2] = g; img.data[o + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  for (let k = 0; k < 26; k++) {                      // rust runs down from the nails
+    const px = rand() * s, len = 10 + rand() * 50;
+    const g = x.createLinearGradient(0, 0, 0, len);
+    g.addColorStop(0, 'rgba(140,70,30,0.45)');
+    g.addColorStop(1, 'rgba(140,70,30,0)');
+    x.fillStyle = g;
+    x.fillRect(px, rand() * s, 2 + rand() * 3, len);
+  }
+}, { repeat });

@@ -395,6 +395,8 @@ const hud = createHud({
 window.__agrocene = {
   get session() { return session; },
   /** Fast-forward n days (testing and screen recording). */
-  advance(n = 1) { for (let k = 0; k < n && session && !session.settled; k++) { session.paused = false; session.acc = 1; session.tick(0); afterChange(); } if (session) { session.paused = true; hud.setTime(session); } }, setLanguage, useSlot, togglePause, openDashboard, showDebrief: () => session && showDebrief(), toggleSatellite, CATALOG };
+  advance(n = 1) { for (let k = 0; k < n && session && !session.settled; k++) { session.paused = false; session.acc = 1; session.tick(0); afterChange(); } if (session) { session.paused = true; hud.setTime(session); } }, setLanguage, useSlot, togglePause, openDashboard, showDebrief: () => session && showDebrief(), toggleSatellite, CATALOG,
+  /** Move the camera for a recorded shot: camera([x, y, z], [targetX, targetY, targetZ], instant). */
+  camera: (pos, target, instant) => world?.shot(pos, target, instant) };
 
 boot();

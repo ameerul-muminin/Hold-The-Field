@@ -192,14 +192,14 @@ function startSession(s) {
   hud.hideSpeech();
   const dry = isDrought(s.cfg);
   if (dry) {
-    hud.say('Rahim', 'Welcome to the Barind. The soil is hard and the sky is wide. Watch the rain.', COLORS.rahim);
-    hud.say('Scout', 'Satellite Scout online. NASA measures the rain and the soil wetness at the farm.', COLORS.scout);
+    hud.say('Rahim', 'Welcome to the Barind. Watch the rain.', COLORS.rahim);
+    hud.say('Scout', 'Scout online: NASA watches rain and soil.', COLORS.scout);
   } else {
-    hud.say('Rahim', 'Welcome to the haor. Walk to the lake and watch the sky.', COLORS.rahim);
-    hud.say('Scout', 'Satellite Scout online. NASA measures the rain in the hills upstream.', COLORS.scout);
+    hud.say('Rahim', 'Welcome to the haor. Watch the sky.', COLORS.rahim);
+    hud.say('Scout', 'Scout online: NASA watches the hills.', COLORS.scout);
   }
-  if (s.mode === MODE_RAHIM) hud.say(null, "Rahim's way: no warning reaches the farm and no action is taken. Press Space and watch the real weather decide.", '#b6d8ff');
-  if (provenance(s.season) === 'sample') hud.say(null, 'SAMPLE DATA: this season uses the labelled sample file until the real NASA POWER data is added.', '#ff9c9c');
+  if (s.mode === MODE_RAHIM) hud.say(null, "Rahim's way: no warning, no action. Press Space.", '#b6d8ff');
+  if (provenance(s.season) === 'sample') hud.say(null, 'SAMPLE DATA: not a real season.', '#ff9c9c');
   hud.update(s);
   hud.prompt(s);
 }
@@ -254,21 +254,16 @@ function toggleSatellite(force) {
 function talkToRahim() {
   const st = session.state, dry = isDrought(session.cfg);
   let line;
-  if (!st.alive) line = dry ? 'The sun took it. My father always said water is the real harvest... next season I will watch the soil and keep the tank for the flowering weeks.'
-    : 'The water took it. My father always said the sky warns before it takes... next season I will plant earlier and watch the data.';
-  else if (st.harvested && st.yieldPct > 0.4) line = dry ? 'The rice is home. We watched the soil, we kept the water for the flowering weeks. Alhamdulillah!'
-    : 'The rice is home. We watched the rain in the hills and we did not wait. Alhamdulillah!';
-  else if (st.harvested) line = 'We saved a little. Less than I hoped, but more than nothing.';
-  else if (!dry && st.flooded) line = 'The water is over the bund! Save what you can, cut the rice if it is ripe enough!';
-  else if (dry && st.stressed) line = 'The soil is below what the rice can bear. Irrigate now, from the tank, and hope the rain returns.';
-  else if (st.status === 'warning') line = dry ? 'The scout says the rain has stopped and the soil is drying. Irrigate before the leaves roll, and keep some water for later.'
-    : 'The scout says very heavy rain in the hills. That water reaches the haor in about two days. Raise the bund, or cut the rice if it is 80% ripe.';
-  else if (st.status === 'watch') line = dry ? 'The rain is thinning out. Keep an eye on the scout, and on the soil gauge.'
-    : 'Rain is building up in the hills. Keep an eye on the scout, and on the water gauge by the embankment.';
-  else if (st.maturity >= session.cfg.minHarvestMaturity) line = dry ? 'The rice is ripe enough to cut. The dry weather is on our side now.' : 'The rice is ripe enough to cut. Every day we wait, the spring rains get closer.';
+  if (!st.alive) line = dry ? 'The sun took it. Next season I keep the tank for flowering.' : 'The water took it. Next season I plant earlier and watch the data.';
+  else if (st.harvested && st.yieldPct > 0.4) line = dry ? 'The rice is home. We kept water for flowering. Alhamdulillah!' : 'The rice is home. We watched the hills and did not wait. Alhamdulillah!';
+  else if (st.harvested) line = 'We saved a little. More than nothing.';
+  else if (!dry && st.flooded) line = 'Water over the bund! Cut the rice if it is ripe!';
+  else if (dry && st.stressed) line = 'The soil is too dry. Irrigate now.';
+  else if (st.status === 'warning') line = dry ? 'The rain has stopped. Irrigate, and keep some water for later.' : 'Heavy rain in the hills. Water in two days. Raise the bund, or cut at 80%.';
+  else if (st.status === 'watch') line = dry ? 'The rain is thinning. Watch the soil gauge.' : 'Rain is building in the hills. Watch the water gauge.';
+  else if (st.maturity >= session.cfg.minHarvestMaturity) line = dry ? 'Ripe enough to cut.' : 'Ripe enough to cut. Spring rain is near.';
   else {
-    hud.speech(f(dry ? 'The rice is {}% grown. The soil must stay wet while it flowers, and the NASA data shows us when it is drying.'
-      : 'The rice is {}% grown. Rain in the hills takes about two days to reach us, so the NASA data gives us a head start.', Math.round(st.maturity * 100)));
+    hud.speech(f(dry ? 'The rice is {}% grown. The soil must stay wet at flowering.' : 'The rice is {}% grown. Hill rain reaches us in two days.', Math.round(st.maturity * 100)));
     audio.sfx.click();
     return;
   }
@@ -281,19 +276,19 @@ function afterChange() {
   const s = session, dry = isDrought(s.cfg);
   for (const e of s.drainEvents()) {
     switch (e.type) {
-      case 'watch': hud.say('Scout', dry ? 'The rain is thinning out and the soil is starting to dry.' : 'Rain is building in the Meghalaya hills.', COLORS.watch); break;
+      case 'watch': hud.say('Scout', dry ? 'Rain thinning, soil drying.' : 'Rain is building in the Meghalaya hills.', COLORS.watch); break;
       case 'warning':
         if (dry) {
-          hud.say('Scout', 'DROUGHT WARNING: no rain for days and the soil is drying fast. Irrigate before the rice suffers!', COLORS.warn);
-          hud.say('Rahim', "The cracks are opening in the neighbours' fields. We must save our water for the flowering weeks.", COLORS.rahim);
+          hud.say('Scout', 'DROUGHT WARNING: irrigate now.', COLORS.warn);
+          hud.say('Rahim', 'Save the water for flowering.', COLORS.rahim);
         } else {
-          hud.say('Scout', 'FLOOD WARNING: heavy rain upstream. Water may reach the haor within days!', COLORS.warn);
-          hud.say('Rahim', 'The sky over the hills has been heavy all week. Something is coming.', COLORS.rahim);
+          hud.say('Scout', 'FLOOD WARNING: heavy rain upstream. Water is coming.', COLORS.warn);
+          hud.say('Rahim', 'The hills have been heavy all week.', COLORS.rahim);
         }
         audio.sfx.warning();
         break;
       case 'flood': hud.say('Rahim', 'The water is over the bund!', COLORS.flood); audio.sfx.flood(); world.burst('flood'); break;
-      case 'stress': hud.say('Rahim', 'The leaves are rolling up. The rice is thirsty.', COLORS.flood); audio.sfx.error(); break;
+      case 'stress': hud.say('Rahim', 'The rice is thirsty.', COLORS.flood); audio.sfx.error(); break;
       case 'loss': hud.say('Rahim', dry ? 'Everything we planted... dried up in the field.' : 'Everything we planted... gone under the water.', COLORS.loss); audio.sfx.error(); break;
       case 'harvest':
         hud.say('Rahim', s.state.yieldPct > 0 ? 'The rice is home!' : 'The season is over.', COLORS.good);
@@ -313,7 +308,7 @@ function grant(list) {
   for (const a of list) {
     toast(a.title);
     audio.sfx.achieve();
-    hud.say('Advancement', `${t(a.title)}: ${t(a.description)}`, COLORS.adv);
+    hud.say('Advancement', a.title, COLORS.adv);
   }
 }
 

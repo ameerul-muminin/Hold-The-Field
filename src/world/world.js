@@ -243,6 +243,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const fill = target.fieldWaterY > view.fieldWaterY ? 0.55 : 2.6;
     view.fieldWaterY += (target.fieldWaterY - view.fieldWaterY) * (1 - Math.exp(-dt * fill));
     view.tint.lerp(target.tint, k);
+    view.harvested = target.harvested;
     view.soil.lerp(target.soil, k);
     satT += ((mode === 'satellite' ? 1 : 0) - satT) * (1 - Math.exp(-dt * 4));
 

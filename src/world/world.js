@@ -194,7 +194,8 @@ export function createWorld(canvas, { mobile = false } = {}) {
     sacks.set(st.harvested && st.alive ? Math.round(st.yieldPct * 14) : 0);
     // satellite overlay colours; the neighbours' plots follow the season
     if (parts.setOverlay) parts.setOverlay(day, st, data);
-    if (parts.fields && data?.days?.length) parts.fields.setSeason(st.i / (data.days.length - 1));
+    if (data?.days?.length) view.season = st.i / (data.days.length - 1);
+    if (parts.fields) parts.fields.setSeason(view.season ?? 0.3);
   }
 
   function burst(kind) {
@@ -351,12 +352,13 @@ export function createWorld(canvas, { mobile = false } = {}) {
     // ground: lowland around the field, lake bed to the north
     const plots = [[-62, 4, 36, 30], [62, 34, 30, 24], [-10, 44, 40, 22]];
     const flats = [...plots, [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8], [POND.x, POND.z, 16, 16]];
-    const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
+    const heightAt = (x, z) => {
       const lake = smooth(LAKE_EDGE + 1, LAKE_EDGE - 7, z);
       const flat = flatMask(x, z, flats);
       const base = 0.1 + fbm(x * 0.02, z * 0.02, 3) * 0.7;
       return (base * (1 - flat) - 0.1 * flat) * (1 - lake) + (-3.2 + fbm(x * 0.01, z * 0.01, 2)) * lake;
-    }, (x, z, y, c) => {
+    };
+    const ground = terrain(1600, 1600, mobile ? 90 : 140, heightAt, (x, z, y, c) => {
       const g = 0.5 + 0.5 * noise2(x * 0.05, z * 0.05), dryPatch = fbm(x * 0.008 + 3, z * 0.008, 3);
       c.setRGB(0.38 + g * 0.07 + dryPatch * 0.16, 0.47 + g * 0.08 + dryPatch * 0.06, 0.25 + g * 0.04);   // olive grass, drier patches
       if (y < -0.6) c.setRGB(0.3, 0.33, 0.27);
@@ -407,7 +409,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     group.add(soil);
     const bund = makeBund(1.7, false);
     group.add(bund.group);
-    const village = buildVillage(group, { flood: true, mobile, clear: (x, z, r) => clearOfFarm(x, z, r, plots) });
+    const village = buildVillage(group, { flood: true, mobile, heightAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots), openLand });
     out.sackOffset = village.sackOffset;
     trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
     const boat = makeBoat();
@@ -473,10 +475,11 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const out = {};
     const plots = [[-60, 2, 36, 30], [60, 36, 30, 24], [-8, 46, 42, 22], [8, -48, 46, 28]];
     const flats = [...plots, [-36, 27, 16, 16], [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8]];          // + the village tank and the homestead
-    const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
+    const heightAt = (x, z) => {
       const flat = flatMask(x, z, flats);
       return (0.1 + fbm(x * 0.015, z * 0.015, 3) * 1.4) * (1 - flat) - 0.1 * flat;
-    }, (x, z, y, c) => {
+    };
+    const ground = terrain(1600, 1600, mobile ? 90 : 140, heightAt, (x, z, y, c) => {
       const g = 0.5 + 0.5 * noise2(x * 0.04, z * 0.04);
       const dryPatch = fbm(x * 0.008 + 3, z * 0.008, 3);
       c.setRGB(0.54 + g * 0.08 + dryPatch * 0.08, 0.5 + g * 0.07, 0.3 + g * 0.05);
@@ -501,7 +504,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const bund = makeBund(0.9, true);
     bund.setHeight(0.32);
     group.add(bund.group);
-    const village = buildVillage(group, { flood: false, mobile, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14 });
+    const village = buildVillage(group, { flood: false, mobile, heightAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14, openLand: (x, z, r) => openLand(x, z, r) && Math.hypot(x + 36, z - 27) > r + 10 });
     out.sackOffset = village.sackOffset;
     trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
     // the village tank
@@ -1116,6 +1119,13 @@ function flatMask(x, z, plots) {
     m = Math.max(m, 1 - smooth(0, 5, Math.hypot(dx, dz)));
   }
   return m;
+}
+
+/** Where animals may stand: anywhere on the plots, but not in the farm's field, on its homestead or under the poles. */
+function openLand(x, z, r) {
+  if (Math.abs(x) < FW / 2 + 4 + r && Math.abs(z) < FD / 2 + 4 + r) return false;
+  if (x > 20 - r && x < 64 + r && z > -16 - r && z < 40 + r) return false;
+  return Math.abs(x + 34) > 2 + r;
 }
 
 /** Room for a neighbouring homestead: off the field, the farm's homestead, the plots, the power line and the camera spots. */

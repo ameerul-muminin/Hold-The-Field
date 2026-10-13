@@ -118,7 +118,7 @@ function walk(points, u) {
 }
 
 /** A farm worker: lungi, vest or bare shoulders, a gamchha tied round the head. Poses: walk, carry, thresh. */
-function person(lungi, vest = null, threshing = false) {
+export function person(lungi, vest = null, threshing = false) {
   const group = new THREE.Group();
   const skin = MAT({ color: ['#7a4f33', '#8a5d3d', '#6b4430'][Math.floor(rand() * 3)] });
   const body = new THREE.Group();

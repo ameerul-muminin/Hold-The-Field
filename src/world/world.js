@@ -7,6 +7,7 @@ import { noise2, fbm, ridged, rand } from './noise.js';
 import { grassTexture, mudTexture, earthTexture, hillTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
 import { buildVillage, HOME, POND } from './village.js';
 import { patchwork, treeline } from './landscape.js';
+import { routes, buildCountryside, fogLayers } from './countryside.js';
 
 export const VS = 1.6;                       // vertical scale: 1 m of water or rice = 1.6 world units
 const FW = 48, FD = 32;                      // rice field size (world units), centred on the origin
@@ -112,6 +113,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   scene.add(bursts.points);
   const clouds = makeClouds(mobile ? 14 : 26);
   scene.add(clouds.group);
+  const kuasha = fogLayers(mobile);                // winter morning fog lying over the fields
+  scene.add(kuasha.group);
+  const FOG_COLOR = new THREE.Color('#dfe5e8');
 
   // ---------------------------------------------------------------- rice (one instanced mesh)
   const rice = makeRice(mobile ? 0.74 : 0.52, mobile ? 5 : 7);
@@ -128,7 +132,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
   const view = {
     lakeY: -0.5, fieldWaterY: -0.4, bundH: 0.6 * VS, growth: 0.3, tint: PAL.green.clone(), droop: 0,
     rainFarm: 0, rainUp: 0, storm: 0, dryness: 0, moisture: 0.6, tankFrac: 0.6, harvested: false, ripe: 0,
-    soil: PAL.soilWet.clone(), pose: 'idle', overlay: 0, lightning: 0,
+    soil: PAL.soilWet.clone(), pose: 'idle', overlay: 0, lightning: 0, fogK: 0,
   };
   const target = { ...view, tint: view.tint.clone(), soil: view.soil.clone() };
   let mode = 'title';
@@ -195,6 +199,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     // satellite overlay colours; the neighbours' plots follow the season
     if (parts.setOverlay) parts.setOverlay(day, st, data);
     if (data?.days?.length) view.season = st.i / (data.days.length - 1);
+    // winter fog follows the NASA record: the colder the day in December-January (haor) or November-December (Barind)
+    const season = view.season ?? 0.3;
+    const winter = dry ? smooth(0.78, 0.92, season) : 1 - smooth(0.22, 0.4, season);
+    target.fogK = winter * Math.max(0, Math.min(1, (28.5 - day.tmax) / 5));
     if (parts.fields) parts.fields.setSeason(view.season ?? 0.3);
   }
 
@@ -239,7 +247,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     started = true;
     t += dt;
     const k = 1 - Math.exp(-dt * 2.6);
-    for (const key of ['lakeY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac']) {
+    for (const key of ['lakeY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac', 'fogK']) {
       view[key] += (target[key] - view[key]) * k;
     }
     // the field fills more slowly than the lake rises, so the water is seen pouring over the bund
@@ -269,6 +277,16 @@ export function createWorld(canvas, { mobile = false } = {}) {
     skyUniforms.flash.value = flash;
     skyUniforms.sunAmt.value = Math.max(0, 1 - view.storm * 1.3);
     hemi.intensity += flash * 3;
+    // kuasha: on the cold winter days of the record the fields lie under morning fog (never on the title shot)
+    const fk = view.fogK * (1 - satT) * (mode === 'title' ? 0 : 1);
+    if (fk > 0.001) {
+      scene.fog.color.lerp(FOG_COLOR, fk * 0.85);
+      scene.fog.near = scene.fog.near * (1 - fk) + 4 * fk;
+      scene.fog.far = scene.fog.far * (1 - fk) + 290 * fk;
+      skyUniforms.horizon.value.lerp(FOG_COLOR, fk * 0.75);
+      sun.intensity *= 1 - fk * 0.5;
+    }
+    kuasha.update(t, fk);
     envClock += dt;
     if (flash === 0 && envClock > 1.5 && Math.abs(view.storm - envStorm) > 0.08) { envClock = 0; skyUniforms.flash.value = 0; updateEnvironment(view.storm); }
 
@@ -364,6 +382,8 @@ export function createWorld(canvas, { mobile = false } = {}) {
       if (y < -0.6) c.setRGB(0.3, 0.33, 0.27);
     });
     group.add(ground);
+    const groundAt = meshHeight(ground);
+    const rt = routes({ flood: true });
     out.fields = patchwork(ground.material);
     const horizon = treeline({ full: false });
     group.add(horizon);
@@ -409,9 +429,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     group.add(soil);
     const bund = makeBund(1.7, false);
     group.add(bund.group);
-    const village = buildVillage(group, { flood: true, mobile, heightAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots), openLand });
+    const village = buildVillage(group, { flood: true, mobile, heightAt: groundAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && !rt.near(x, z, r), openLand: (x, z, r) => openLand(x, z, r) && !rt.near(x, z, r) });
+    const country = buildCountryside(group, { routes: rt, groundAt, mobile, flood: true, edges: farmEdges(true) });
     out.sackOffset = village.sackOffset;
-    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
+    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && !rt.near(x, z, 2) && Math.hypot(x, z) < 260);
     const boat = makeBoat();
     boat.position.set(-30, -0.5, LAKE_EDGE - 30);
     group.add(boat);
@@ -433,6 +454,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     };
     out.update = (time, dt, v, sat) => {
       village.update(time, dt, v);
+      country.update(time, dt, v, sat);
       horizon.visible = sat < 0.3;
       lake.mesh.position.y = v.lakeY;
       lake.wave(time, 0.12 + v.storm * 0.25);
@@ -485,6 +507,8 @@ export function createWorld(canvas, { mobile = false } = {}) {
       c.setRGB(0.54 + g * 0.08 + dryPatch * 0.08, 0.5 + g * 0.07, 0.3 + g * 0.05);
     });
     group.add(ground);
+    const groundAt = meshHeight(ground);
+    const rt = routes({ flood: false });
     out.fields = patchwork(ground.material);
     const horizon = treeline({ full: true });
     group.add(horizon);
@@ -504,9 +528,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const bund = makeBund(0.9, true);
     bund.setHeight(0.32);
     group.add(bund.group);
-    const village = buildVillage(group, { flood: false, mobile, heightAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14, openLand: (x, z, r) => openLand(x, z, r) && Math.hypot(x + 36, z - 27) > r + 10 });
+    const village = buildVillage(group, { flood: false, mobile, heightAt: groundAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14 && !rt.near(x, z, r), openLand: (x, z, r) => openLand(x, z, r) && Math.hypot(x + 36, z - 27) > r + 10 && !rt.near(x, z, r) });
+    const country = buildCountryside(group, { routes: rt, groundAt, mobile, flood: false, edges: farmEdges(false) });
     out.sackOffset = village.sackOffset;
-    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
+    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && !rt.near(x, z, 2) && Math.hypot(x, z) < 300, true);
     // the village tank
     const tank = makeTank();
     tank.group.position.set(-36, 0, 27);
@@ -522,6 +547,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const lush = new THREE.Color('#b9d98a'), parched = new THREE.Color('#ffffff');
     out.update = (time, dt, v, sat) => {
       village.update(time, dt, v);
+      country.update(time, dt, v, sat);
       horizon.visible = sat < 0.3;
       ground.material.color.copy(lush).lerp(parched, v.dryness);
       soil.material.color.copy(v.soil);
@@ -1119,6 +1145,42 @@ function flatMask(x, z, plots) {
     m = Math.max(m, 1 - smooth(0, 5, Math.hypot(dx, dz)));
   }
   return m;
+}
+
+/** The rendered height of a terrain mesh at (x, z): the same triangles the GPU draws, so nothing floats or sinks. */
+function meshHeight(mesh) {
+  const { width, height, widthSegments: sx, heightSegments: sz } = mesh.geometry.parameters;
+  const pos = mesh.geometry.attributes.position.array, gx = sx + 1, cw = width / sx, ch = height / sz;
+  const h = (ix, iz) => pos[(iz * gx + ix) * 3 + 1];
+  return (x, z) => {
+    const fx = (x + width / 2) / cw, fz = (z + height / 2) / ch;
+    const ix = Math.min(sx - 1, Math.max(0, Math.floor(fx))), iz = Math.min(sz - 1, Math.max(0, Math.floor(fz)));
+    const u = fx - ix, v = fz - iz;
+    const a = h(ix, iz), b = h(ix, iz + 1), c = h(ix + 1, iz + 1), d = h(ix + 1, iz);
+    return u + v <= 1 ? a + (d - a) * u + (b - a) * v : c + (b - c) * (1 - u) + (d - c) * (1 - v);
+  };
+}
+
+/** Edges where grass grows: round the field's bund, at the foot of the homestead mound, round the pond. */
+function farmEdges(flood) {
+  const rect = (cx, cz, hw, hd) => ({
+    length: 4 * (hw + hd),
+    at(u) {
+      let t = u * 2 * (hw * 2 + hd * 2);
+      const j = (rand() - 0.5) * 1.2;
+      if (t < hw * 2) return [cx - hw + t, cz - hd + j];
+      t -= hw * 2;
+      if (t < hd * 2) return [cx + hw + j, cz - hd + t];
+      t -= hd * 2;
+      if (t < hw * 2) return [cx + hw - t, cz + hd + j];
+      t -= hw * 2;
+      return [cx - hw + j, cz + hd - t];
+    },
+  });
+  const ring = (cx, cz, r) => ({ length: 2 * Math.PI * r, at(u) { const a = u * Math.PI * 2, rr = r + (rand() - 0.5) * 1.2; return [cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]; } });
+  const edges = [rect(0, 0, FW / 2 + 1.7, FD / 2 + 1.7), rect(HOME.x, HOME.z, HOME.w / 2 + 4.4, HOME.d / 2 + 4.4)];
+  if (flood) edges.push(ring(POND.x, POND.z, POND.r + 1.8));
+  return edges;
 }
 
 /** Where animals may stand: anywhere on the plots, but not in the farm's field, on its homestead or under the poles. */

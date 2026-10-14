@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { fbm, noise2, rand } from './noise.js';
 import { grassTexture, earthTexture, thatchTexture, plasterTexture, frondTexture, tinTexture, waterNormalTexture } from './textures.js';
 import { harvestCrew } from './harvest.js';
+import { wildlife } from './wildlife.js';
 
 export const HOME = { x: 41, z: 6, w: 26, d: 24, h: 0.7 };      // homestead mound (top), east of the field
 export const POND = { x: 38, z: 28, r: 5.5 };     // south of the mound, in front of the default camera
@@ -14,7 +15,7 @@ const smooth = (e0, e1, v) => { const t = Math.max(0, Math.min(1, (v - e0) / (e1
 const MAT = (o) => new THREE.MeshLambertMaterial(o);
 
 /** Builds the village into group. Returns { update(time, dt, view), sackOffset }. */
-export function buildVillage(group, { flood, mobile, clear = () => true }) {
+export function buildVillage(group, { flood, mobile, clear = () => true, openLand = clear, heightAt = () => 0 }) {
   const H = HOME.h, top = (o) => { o.position.y += H; return o; };
   const shadows = (o) => { o.traverse?.((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
   const updates = [];
@@ -59,7 +60,12 @@ export function buildVillage(group, { flood, mobile, clear = () => true }) {
   group.add(powerLine(-34, -10, 70, 14));
 
   // ---------------------------------------------------------------- neighbouring homesteads: tree clumps across the plots
-  group.add(groves({ flood, mobile, clear }));
+  const clumps = groves({ flood, mobile, clear });
+  group.add(clumps);
+  // egrets in the plots and cattle grazing, kept out of the clumps
+  const life = wildlife({ flood, mobile, clear: openLand, groves: clumps.userData.spots, heightAt });
+  group.add(life.group);
+  updates.push(life.update);
 
   // ---------------------------------------------------------------- the haor beyond, or the Barind's palmyra rows
   if (flood) {
@@ -596,6 +602,7 @@ function groves({ flood, mobile, clear }) {
   });
   mounds.receiveShadow = true;
   g.add(mounds, crowns, walls, roofs, betelPalms(palms, mobile));
+  g.userData.spots = spots;
   return g;
 }
 

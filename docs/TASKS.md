@@ -8,28 +8,28 @@ Model column: S = Sonnet (default), O = Opus (only if Sonnet fails twice), F = F
 
 ## Must (the submission fails Relevance without these)
 
-- [ ] **T1 Climate fetcher** (S). `data-pipeline/fetch_climate.py` per SPEC "Data contract". First make one small
+- [x] **T1 Climate fetcher** (S). `data-pipeline/fetch_climate.py` per SPEC "Data contract". First make one small
   request to confirm every POWER parameter name, including `IMERG_PRECTOT`; record the result in `docs/DATA.md`.
   Write `data/climate/{haor,barind,coast}.json`. Add `src/rotation/climate.js` (load + expand to days) with tests.
   Done when: 3 files exist, `sample: false`, tests pass.
-- [ ] **T2 Crops and rotations** (H: Yaminur, with S for formatting). Fill `data/crops.json` and
+- [x] **T2 Crops and rotations** (AI-collected 11 Nov; STILL NEEDS Yaminur's review) (H: Yaminur, with S for formatting). Fill `data/crops.json` and
   `data/rotations.json`. Every number has a source URL or is `null`. Three or more rotations per region, one existing.
   Done when: the `number-checker` agent reports zero unsourced values.
-- [ ] **T3 ET0 and season model** (S). `src/rotation/et0.js`, `season.js` with tests (FAO-56 worked example;
+- [x] **T3 ET0 and season model** (S). `src/rotation/et0.js`, `season.js` with tests (FAO-56 worked example;
   a dry year gives a bigger gap than a wet year; an irrigated crop keeps yield but uses water).
-- [ ] **T4 Replay** (S). `src/rotation/replay.js`, `soil.js` with tests. Haor flood factor reuses `src/sim` autoplay.
+- [x] **T4 Replay** (S). `src/rotation/replay.js`, `soil.js` with tests. Haor flood factor reuses `src/sim` autoplay.
   Check: haor existing rotation is lost in 2017.
-- [ ] **T5 Rank, evidence, farmer inputs** (S). `rank.js`, `evidence.js`, `scenario.js`, `farmer.js` with tests.
-- [ ] **R1 Review** (F). Run the `spec-reviewer` agent on `src/rotation/`. Fix what it finds before any UI.
-- [ ] **T6 Rotation Lab screen** (S). `src/ui/rotation.js` per SPEC "The screen", items 1 to 5 and 8.
+- [x] **T5 Rank, evidence, farmer inputs** (S). `rank.js`, `evidence.js`, `scenario.js`, `farmer.js` with tests.
+- [x] **R1 Review** (F). Run the `spec-reviewer` agent on `src/rotation/`. Fix what it finds before any UI.
+- [x] **T6 Rotation Lab screen** (built as `lab.html`) (S). `src/ui/rotation.js` per SPEC "The screen", items 1 to 5 and 8.
   Reuse `src/ui/chart.js` and theme. Done when: works at 360 px wide, loops 1 and 2 of the old demo still work.
-- [ ] **T7 Bengali** (S + H). Add every new string to `lang/bn-web.txt`; run the `bn-strings` agent. Native review: Marwa.
+- [ ] **T7 Bengali** (strings written by AI; native review by Marwa still open) (S + H). Add every new string to `lang/bn-web.txt`; run the `bn-strings` agent. Native review: Marwa.
 
 ## Should (these move Validity and NASA-data scores)
 
-- [ ] **T8 What-if sliders** (S). SPEC screen item 6.
+- [x] **T8 What-if sliders** (S). SPEC screen item 6.
 - [ ] **T9 NDVI** (S). `data-pipeline/fetch_ndvi.py`, `data/ndvi/*.json`, SPEC screen item 7. Verify the API first.
-- [ ] **T10 Validation doc** (S + H). `docs/VALIDATION.md` backtest table. Yaminur supplies documented bad years.
+- [ ] **T10 Validation doc** (`docs/VALIDATION.md` drafted; Yaminur to source 2004, 2010, 2016) (S + H). `docs/VALIDATION.md` backtest table. Yaminur supplies documented bad years.
 - [ ] **T11 Barind real drought year** (S). Pick it from the climate file, refetch with `fetch_power.py`,
   recalibrate per `docs/DATA.md`, remove the SAMPLE badge. Sim numbers change: update Java `Config` too or
   leave the desktop build on the old file and say so in the README.

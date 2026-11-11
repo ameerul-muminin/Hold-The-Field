@@ -1,6 +1,6 @@
 # Replay Engine spec (Rotation Lab)
 
-Owner: Azman. Lead: Fable. Status: v1, 10 Nov 2026. Tasks live in `docs/TASKS.md`.
+Owner: Azman. Lead: Fable. Status: v2, 11 Nov 2026 (built; see "Changes in v2" at the end). Tasks live in `docs/TASKS.md`.
 
 ## Why this exists
 
@@ -204,3 +204,16 @@ Never claim a dataset on screen, in the video or on the NASA page unless it is i
 ## Out of scope
 
 New 3D work, the Java build, accounts, a backend, salinity mechanics for the coast (state it as a gap).
+
+## Changes in v2 (as built, 11 Nov)
+
+- The Rotation Lab is a standalone page, `lab.html` + `src/lab/` + `styles/lab.css`, linked from the title screen,
+  not a screen inside the game. It loads without the 3D world, so it is fast on a cheap phone and cannot break the game.
+- Water: `season.js` uses a root-zone water store with day-to-day carryover, started from NASA GWETROOT on the sowing
+  day. `hold` is the store capacity in mm (default 100; clay 140, loam 110, sandy 60, all placeholders).
+- Yield metric for ranking is `harvestMedian`: crop-seasons brought home per year, so an extra crop counts.
+- Rank rows carry `flat`: metrics equal across all rotations, which are never given as the reason for a rank.
+- Crops in use: boro (long, short), T. Aman, mustard, lentil, sunflower. Mung bean and chickpea were dropped
+  because no sourced field duration was found.
+- Not built: NDVI strip (no data yet), GPM (not available from POWER), SMAP / GRACE / SRTM.
+

@@ -18,11 +18,12 @@ const metrics = (s) => ({
 export function rank(results, priorities) {
   const m = results.map((r) => metrics(r.summary));
   const norm = {};
+  const flat = [];   // metrics on which every rotation is equal: they cannot explain a rank
   for (const k of KEYS) {
     const vals = m.map((x) => x[k]);
     const lo = Math.min(...vals), hi = Math.max(...vals);
     norm[k] = vals.map((v) => {
-      if (hi === lo) return 0.5;
+      if (hi === lo) { if (!flat.includes(k)) flat.push(k); return 0.5; }
       const t = (v - lo) / (hi - lo);
       return k === 'water' ? 1 - t : t; // less irrigation water is better
     });
@@ -32,9 +33,10 @@ export function rank(results, priorities) {
     const parts = {};
     for (const k of KEYS) parts[k] = wsum > 0 ? ((priorities[k] || 0) * norm[k][i]) / wsum : 0;
     const score = KEYS.reduce((s, k) => s + parts[k], 0);
-    let top = KEYS[0];
-    for (const k of KEYS) if (parts[k] > parts[top]) top = k;
-    return { id: r.id, score, parts, top, conflict: !!r.conflict, _i: i };
+    const live = KEYS.filter((k) => !flat.includes(k) && (priorities[k] || 0) > 0);
+    let top = live[0] ?? KEYS[0];
+    for (const k of live) if (parts[k] > parts[top]) top = k;
+    return { id: r.id, score, parts, top, flat, conflict: !!r.conflict, _i: i };
   });
   rows.sort((a, b) => (a.conflict - b.conflict) || (b.score - a.score) || (a._i - b._i));
   return rows.map(({ _i, ...rest }) => rest);

@@ -77,6 +77,7 @@ export function titleScreen({ onPlay, onField, onAbout, onAdvancements, dataStat
         <div class="title-menu">
           <button class="btn primary big" id="tPlay">${T('Play')}</button>
           <button class="btn field-btn" id="tField">${T('My field today')}</button>
+          <button class="btn" id="tLab">${T('Rotation Lab')}</button>
           <button class="btn" id="tAbout">${T('Data & Model')}</button>
           <button class="btn" id="tAdv">${T('Advancements')}</button>
         </div>
@@ -88,6 +89,7 @@ export function titleScreen({ onPlay, onField, onAbout, onAdvancements, dataStat
     wireLang(h);
     h.querySelector('#tPlay').onclick = onPlay;
     h.querySelector('#tField').onclick = onField;
+    h.querySelector('#tLab').onclick = () => { window.location.href = 'lab.html'; };
     h.querySelector('#tAbout').onclick = onAbout;
     h.querySelector('#tAdv').onclick = onAdvancements;
   };

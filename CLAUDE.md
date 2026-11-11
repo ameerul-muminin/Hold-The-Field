@@ -5,13 +5,14 @@ Web build: static ES modules, no build step, three.js vendored in `vendor/`. Liv
 Submission repo: github.com/ameerul-muminin/Hold-The-Field (remote `fork`). Work on branch `rotation-lab`.
 
 ## What we are building now
-The Rotation Lab: replay 3+ crop rotations against 25 real years of NASA data. Read `docs/SPEC.md` (what) and
-`docs/TASKS.md` (order). Do exactly one task per session. Do not redesign the spec; if it is wrong, stop and say so.
+The Rotation Lab (`lab.html`, `src/lab/`, `src/rotation/`): replays 3+ crop rotations against 25 real years of NASA
+data. It is built. Tonight's work is `docs/NEXT.md`, in order, one task per session. Design and copy rules:
+`docs/DESIGN.md`. Background: `docs/SPEC.md`, `docs/VALIDATION.md`. Do not redesign the engine; if it is wrong, stop and say so.
 
 ## Commands
 - Test: `node --test` (all tests must pass before a task is done)
 - Run: `python -m http.server 5173`, open http://localhost:5173
-- Data: `python data-pipeline/fetch_climate.py --region barind`
+- Data: `python data-pipeline/fetch_climate.py --region all` (needs internet), then `npm run build-lab` once N5 exists
 
 ## Hard rules
 - Never edit `src/sim/*` or `src/game/session.js`. They mirror the Java build. Import from them only.

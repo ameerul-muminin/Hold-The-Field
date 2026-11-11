@@ -14,8 +14,13 @@ const memo = new Map();
 let lang = 'en';
 const listeners = new Set();
 
-export async function loadLanguages() {
-  try { lang = localStorage.getItem(`${BRAND.storageKey}-lang`) === 'bn' ? 'bn' : 'en'; } catch { /* storage unavailable */ }
+/** @param {{fallback?:'en'|'bn'}} [o] language when the player has never chosen one (the game: en, the Lab: bn) */
+export async function loadLanguages({ fallback = 'en' } = {}) {
+  lang = fallback === 'bn' ? 'bn' : 'en';
+  try {
+    const saved = localStorage.getItem(`${BRAND.storageKey}-lang`);
+    if (saved === 'bn' || saved === 'en') lang = saved;
+  } catch { /* storage unavailable */ }
   await Promise.all(SOURCES.map(async (url) => {
     try {
       const res = await fetch(url);

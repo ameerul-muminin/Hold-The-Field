@@ -9,32 +9,94 @@ import { expand } from '../rotation/climate.js';
 export const REGIONS = ['haor', 'barind', 'coast'];
 export const REGION_NAMES = { haor: 'Sunamganj haor', barind: 'Barind Tract', coast: 'Satkhira coast' };
 
-/** The four sliders: label on the slider, short phrase for sentences. */
+/** "What do you fear most?" One choice; it gets weight 100, the other three keep 50 (the old default).
+ *  label is the chip, short what a way does well on that count (used in "Where it does best: {}."). */
 export const PRIORITIES = [
-  { key: 'safety', label: 'Fewer lost years', short: 'fewer lost years', default: 100 },
-  { key: 'yield', label: 'More harvest', short: 'more harvest', default: 50 },
-  { key: 'water', label: 'Less irrigation water', short: 'less irrigation water', default: 50 },
-  { key: 'soil', label: 'Healthier soil', short: 'healthier soil', default: 50 },
+  { key: 'safety', label: 'Losing the crop', short: 'fewer lost years', default: 100 },
+  { key: 'yield', label: 'A small harvest', short: 'more harvest', default: 50 },
+  { key: 'water', label: 'Pumping water', short: 'less pumped water', default: 50 },
+  { key: 'soil', label: 'Tired soil', short: 'more back to the soil', default: 50 },
 ];
+export const FEAR_WEIGHT = 100, OTHER_WEIGHT = 50;
+/** Slider weights for one fear. */
+export const prioFor = (fear) => Object.fromEntries(PRIORITIES.map((p) => [p.key, p.key === fear ? FEAR_WEIGHT : OTHER_WEIGHT]));
 
 /** Plain words for the empty fields of crops.json. */
 export const GAP_WORDS = {
-  ky: 'response to water shortage', heatC: 'heat limit', price: 'price', market: 'market',
-  forage: 'fodder value', cover: 'erosion cover', organicMatter: 'organic matter',
+  ky: 'how it takes a dry spell', heatC: 'how much heat it takes', price: 'the price', market: 'who buys it',
+  forage: 'its value as cattle feed', cover: 'how well it holds the soil', organicMatter: 'what it gives back to the soil',
 };
 /** Plain words for the sourced fields of crops.json. */
 export const PARAM_WORDS = {
-  days: 'days in the field', kc: 'water need', stageShare: 'growth stages', ky: 'response to water shortage',
-  heatC: 'heat limit', rootDepth: 'root depth', irrigated: 'irrigation',
+  days: 'days in the field', kc: 'water it needs', stageShare: 'how it grows', ky: 'how it takes a dry spell',
+  heatC: 'how much heat it takes', rootDepth: 'root depth', irrigated: 'pumped water',
 };
-/** One sentence per reason a rotation ranks where it does. */
+/** Why the first card is first. safety has a flood-region version. */
 export const WHY_RANK = {
-  safety: 'It ranks here mostly because it has fewer lost years.',
-  yield: 'It ranks here mostly because it gives more harvest.',
-  water: 'It ranks here mostly because it needs less irrigation water.',
-  soil: 'It ranks here mostly because it is better for the soil.',
+  safety: 'Safest in the bad years.',
+  safetyFlood: 'Safest in the flood years.',
+  yield: 'Brings home the most harvest.',
+  water: 'Needs the least pumped water.',
+  soil: 'Gives the most back to the soil.',
+};
+/** For a card below first place: what holds it back. */
+export const WHY_LOW = {
+  safety: 'Failed in more years.',
+  yield: 'Brings home less harvest.',
+  water: 'Needs more pumped water.',
+  soil: 'Gives less back to the soil.',
 };
 export const SOIL_CHOICES = [['clay', 'Clay'], ['loam', 'Loam'], ['sandy', 'Sandy'], ['', 'Not sure']];
+
+/** Short crop names for sentences and the satellite panel; the full name stays in crops.json. */
+export const CROP_SHORT = {
+  boro_long: 'Boro rice', boro_short: 'Short boro rice', t_aman: 'Aman rice',
+  mustard: 'Mustard', lentil: 'Lentil', sunflower: 'Sunflower',
+};
+/** One word for a crop inside a sentence ("the rice came home"). */
+const CROP_WORD = { boro_long: 'rice', boro_short: 'rice', t_aman: 'rice', mustard: 'mustard', lentil: 'lentil', sunflower: 'sunflower' };
+
+/** 'rice' when every crop of the rotation is rice, else 'crop'. */
+export function cropWord(rotation) {
+  const words = [...new Set((rotation?.slots || []).map((s) => CROP_WORD[s.crop] ?? 'crop'))];
+  return words.length === 1 ? words[0] : 'crop';
+}
+
+/** Engine sentences (src/rotation/evidence.js templates) in the Lab's plain voice. Same {} order. */
+export const PLAIN = {
+  'Serves your {} priority best': 'Where it does best: {}.',
+  'Came through {} of {} years ({} to {})': '{} of {} years, the crop came home ({} to {}).',
+  'Data: {}': 'Weather: {}.',
+  'Worst years: {}': 'Hardest years: {}.',
+  'Uses about {} mm less irrigation water a year': 'About {} mm less water to pump each year.',
+  'Soil health indicator up {} points ({} to {})': 'Gives more back to the soil: {} points more ({} to {}, our estimate).',
+  '{} fewer bare-field days a year': 'The field lies empty {} fewer days a year.',
+  '{} fewer failed years out of {}': '{} fewer bad years, out of {}.',
+  'No advantage over what you grow now in this model': 'In these years, it did no better than what you grow now.',
+  'No market prices in the model': 'We do not know your market price. Ask before you plant.',
+  'No salinity data': 'We have no salt readings for your field.',
+  'No pest or disease model': 'We do not count pests or disease.',
+  'One NASA POWER grid cell is about {} km wide; your field can differ': 'The weather is for a square about {} km wide. Your field can differ.',
+  'Rain-shortage losses use a default response for some crops': 'For some crops, we used a standard guess for dry spells.',
+  'Seed availability': 'Can you get the seed?',
+  'Irrigation access': 'Can you get pump water on time?',
+  'Market': 'Will someone buy it, and at what price?',
+  'Labour and machines': 'Are there hands and machines when you need them?',
+  'Talk to your extension officer': 'Talk to your extension officer.',
+  // data notes from rotations.json
+  'Deepwater (broadcast) Aman rice is not modelled': 'We cannot check the deepwater Aman part yet.',
+  'Sowing date is an assumption: it depends on when the haor water leaves the field.': 'We guessed the sowing date. It depends on when the water leaves your field.',
+  'Mustard and late boro dates are assumptions fitted between the Aman harvest and the next Aman.': 'We guessed the mustard and late boro dates, to fit between two Aman crops.',
+};
+/** {text, vals} from the engine -> same line in plain words. Unknown lines pass through. */
+export const plain = (l) => (PLAIN[l.text] ? { text: PLAIN[l.text], vals: l.vals } : l);
+
+/** 'little' / 'some' / 'a lot' for the 0..100 soil estimate. */
+export function soilWord(score) {
+  if (score >= 50) return 'a lot';
+  if (score >= 30) return 'some';
+  return 'little';
+}
 
 /** Entries of a JSON object without the keys that start with an underscore. */
 export function dataEntries(obj) {
@@ -51,14 +113,56 @@ export function yearClass(y) {
 
 export const lostYears = (result) => result.years.filter((y) => y.slots.some((s) => s.lost)).map((y) => y.year);
 
-/** Headline for the region, computed from the existing rotation's replay. Text is an English template. */
-export function headline(result, regionName) {
-  const n = result.summary.n;
+export const failedYearList = (result) => result.years.filter((y) => y.failed ?? ['lost', 'poor'].includes(yearClass(y))).map((y) => y.year);
+
+/**
+ * Step 2: what the satellite record says about what the farmer grows now. All numbers come from the replay.
+ * @param {object} result replay of the existing rotation
+ * @param {{word:string, saferName?:string|null, saferFailed?:number}} o word: 'rice' / 'crop'; saferName: label of a
+ *   way that failed in fewer years, if any
+ * @returns {{kind:'lost'|'thin'|'fine', sat:object[], say:object[], safer:boolean}} lines are {text, vals}
+ */
+export function finding(result, { word = 'crop', saferName = null, saferFailed = 0 } = {}) {
+  const s = result.summary, n = s.n;
   const lost = lostYears(result);
-  if (lost.length) return { text: 'In {} years of NASA data, {} lost its crop in {} years: {}', vals: [n, regionName, lost.length, lost.join(', ')] };
-  const failed = result.summary.failedYears;
-  if (failed > 0) return { text: 'In {} years of NASA data, {} had {} poor years', vals: [n, regionName, failed] };
-  return { text: 'In {} years of NASA data, {} came through every year', vals: [n, regionName] };
+  const L = (text, ...vals) => ({ text, vals });
+  const sat = [], say = [];
+  let kind;
+  if (lost.length) {
+    kind = 'lost';
+    sat.push(L('Lost to flood: {} of {} years', lost.length, n), L(lost.join('  ')));
+    say.push(L('In {} years, the flood took this {} {} times: {}.', n, word, lost.length, lost.join(', ')));
+  } else if (s.failedYears > 0) {
+    kind = 'thin';
+    const thin = failedYearList(result);
+    sat.push(L('Thin years: {} of {}', s.failedYears, n), L(thin.join('  ')));
+    say.push(L('In {} years, the {} was thin {} times: {}.', n, word, s.failedYears, thin.join(', ')));
+  } else {
+    kind = 'fine';
+    sat.push(L('Crop came home: {} of {} years', n, n), L('Field empty: {} days a year', s.bareDays));
+    say.push(L('In {} years, your {} came home every year.', n, word));
+    say.push(L('But your field lies empty {} days a year.', s.bareDays));
+    if (s.waterMedianMm >= 1) say.push(L('You pump about {} mm of water a year for it.', Math.round(s.waterMedianMm)));
+  }
+  const safer = !!saferName;
+  if (safer) {
+    say.push(saferFailed > 0
+      ? L('{} would have failed in {} of these years.', saferName, saferFailed)
+      : L('{} would have come home every year.', saferName));
+  }
+  return { kind, sat, say, safer };
+}
+
+/** The way that failed in the fewest years, if it beats the existing one (no conflicts). */
+export function saferWay(items) {
+  const ex = items.find((i) => i.rotation.existing);
+  if (!ex) return null;
+  let best = null;
+  for (const i of items) {
+    if (i === ex || i.rotation.conflict) continue;
+    if (i.result.summary.failedYears < ex.result.summary.failedYears && (!best || i.result.summary.failedYears < best.result.summary.failedYears)) best = i;
+  }
+  return best;
 }
 
 /** '(https://x.org/a (note)' style source text -> the URL at the start and the rest. url is null when none. */
@@ -127,7 +231,7 @@ export function rankItems(items, prio) {
 /** The five evidence blocks of one rotation. topKey is the rank row's top (a PRIORITIES key) or null. */
 export function evidenceFor(item, baselineItem, crops, climate, topKey) {
   const c = expand(climate);
-  const top = PRIORITIES.find((p) => p.key === topKey)?.short;
+  const top = PRIORITIES.find((p) => p.key === topKey)?.short ?? null;
   return evidenceCard(item.rotation, item.result, crops, item.rotation.existing ? null : baselineItem?.result ?? null, {
     firstYear: c.firstYear, lastYear: c.lastYear, top, datasets: ['NASA POWER rain and temperature'],
   });

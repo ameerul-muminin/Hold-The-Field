@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Agrocene · Rotation Lab</title>
-  <meta name="description" content="Rotation Lab: compare crop rotations on 25 years of NASA weather for a Bangladeshi field. NASA Space Apps Challenge 2026 · Field Shift." />
+  <title>Agrocene · আপনার জমি, বছর ধরে ধরে</title>
+  <meta name="description" content="See how each way of planting would have done on 25 years of NASA weather, for a field in Bangladesh. NASA Space Apps Challenge 2026 · Field Shift." />
   <meta name="theme-color" content="#0a0e15" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f1826'/%3E%3Cpath d='M16 27V12M16 12c-3-1.5-4.5-4.5-4.5-7.5 3 .8 4.5 3 4.5 7.5zm0 0c3-1.5 4.5-4.5 4.5-7.5-3 .8-4.5 3-4.5 7.5zm0 7c-3-1.5-5-4.5-5-7.5 3 .8 5 3 5 7.5zm0 0c3-1.5 5-4.5 5-7.5-3 .8-5 3-5 7.5z' stroke='%23e6be4b' stroke-width='1.8' fill='none'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,16 +15,13 @@
 <body>
   <header class="top" id="top"></header>
   <main class="page" id="main">
-    <section id="sec-region" aria-labelledby="h-region"></section>
-    <section id="sec-head"></section>
-    <section id="sec-field" aria-labelledby="h-field"></section>
-    <section id="sec-whatif"></section>
-    <section id="sec-prio" aria-labelledby="h-prio"></section>
-    <div id="status" role="status" aria-live="polite"></div>
-    <ol class="cards" id="cards"></ol>
+    <section class="step" id="step-where" aria-labelledby="h-where"></section>
+    <section class="step" id="step-saw" aria-labelledby="h-saw" hidden></section>
+    <section class="step" id="step-ways" aria-labelledby="h-ways" hidden></section>
+    <section class="step" id="step-way" aria-labelledby="h-way" hidden></section>
   </main>
   <footer class="foot" id="foot"></footer>
-  <noscript><p class="page">The Rotation Lab needs JavaScript.</p></noscript>
+  <noscript><p class="page">এই পাতাটি চালাতে JavaScript লাগে। This page needs JavaScript.</p></noscript>
   <script type="module" src="src/lab/main.js"></script>
 </body>
 </html>

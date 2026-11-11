@@ -1,10 +1,16 @@
-// Rotation Lab page. Draws the screen and wires the controls; the numbers come from src/rotation/ through view.js.
+// Rotation Lab page. Four steps, one question each:
+//   1 where   Where is your field?
+//   2 saw     What the satellite saw about what you grow now
+//   3 ways    Other ways to plant (What do you fear most?), plus two side doors: your field, what if
+//   4 way     One way in detail
+// The step lives in the URL hash (#haor/ways, #haor/way/short) so the phone's back button walks back.
+// The numbers come from src/rotation/ through view.js; this file only draws and wires.
 import { loadLanguages, setLanguage, onLanguage, language, t, f, num, date } from '../i18n.js';
 import { BRAND } from '../brand.js';
 import {
-  REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, SOIL_CHOICES,
-  dataEntries, yearClass, headline, groupGaps, collectSources, uniqueCrops, computeAll, rankItems,
-  evidenceFor, dataFacts, oneDecimal, pct,
+  REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, WHY_LOW, SOIL_CHOICES, CROP_SHORT,
+  dataEntries, yearClass, finding, saferWay, cropWord, plain, soilWord, prioFor, groupGaps, collectSources,
+  uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct,
 } from './view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,15 +18,18 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const T = (s) => esc(num(t(s)));
 const F = (tpl, ...v) => esc(f(tpl, ...v));
 const signed = (v) => (v > 0 ? `+${v}` : String(v));
+const STEPS = ['where', 'saw', 'ways', 'way'];
 
 const state = {
-  region: 'haor', soil: '', canIrrigate: true, cannotSell: [], noMachine: [],
+  step: 'where', region: 'haor', way: null,
+  fear: 'safety',
+  soil: '', canIrrigate: true, cannotSell: [], noMachine: [],
   rainPct: 0, tempC: 0,
-  prio: Object.fromEntries(PRIORITIES.map((p) => [p.key, p.default])),
+  prio: prioFor('safety'),
   open: {}, picked: {}, status: 'loading',
 };
 const results = { items: [], rows: [], opts: null };
-window.__lab = { state, results };
+window.__lab = { state, results, go: (step, way) => go(step, way) };
 
 let crops = {}, rotationsByRegion = {};
 const climates = new Map();      // region -> climate | null (missing)
@@ -35,136 +44,142 @@ function setHTML(el, html) {
   if (fid) [...el.querySelectorAll('[data-fid]')].find((n) => n.dataset.fid === fid)?.focus();
 }
 const cropName = (id) => t(crops[id]?.name ?? id);
+const cropShort = (id) => t(CROP_SHORT[id] ?? crops[id]?.name ?? id);
 const climate = () => climates.get(state.region) || null;
 const regionRotations = () => rotationsByRegion[state.region] || [];
+const existing = () => results.items.find((i) => i.rotation.existing) || null;
+const itemById = (id) => results.items.find((i) => i.id === id) || null;
+const isFlood = () => state.region === 'haor';
 
-/** A {text, vals} line from the engine -> translated text. String values are translated, numbers are not. */
+/** A {text, vals} line -> plain words, translated. String values are translated, numbers are not. */
 function lineText(l) {
-  const vals = l.vals.map((v) => (typeof v === 'string' && !/^[\d\s.,-]+$/.test(v) ? t(v) : v));
-  return F(l.text, ...vals);
+  const p = plain(l);
+  const vals = p.vals.map((v) => (typeof v === 'string' && !/^[\d\s.,-]+$/.test(v) ? t(v) : v));
+  return F(p.text, ...vals);
+}
+const noteText = (s) => T(plain({ text: s, vals: [] }).text);
+
+// ---------------------------------------------------------------- routing
+function hashFor(step, way) {
+  if (step === 'where') return '#';
+  return `#${state.region}/${step}${step === 'way' && way ? `/${way}` : ''}`;
+}
+function parseHash() {
+  const [region, step, way] = location.hash.replace(/^#/, '').split('/');
+  if (!REGIONS.includes(region)) return { step: 'where' };
+  return { region, step: STEPS.includes(step) && step !== 'where' ? step : 'saw', way: way || null };
+}
+/** Move to a step and push it on the history, so back works. */
+function go(step, way = null) {
+  const h = hashFor(step, way);
+  if (location.hash !== h && !(h === '#' && !location.hash)) history.pushState(null, '', h === '#' ? location.pathname + location.search : h);
+  show(step, way, true);
+}
+function show(step, way, moveFocus) {
+  if (step === 'way' && !itemById(way)) step = results.items.length ? 'ways' : step;
+  state.step = step; state.way = step === 'way' ? way : null;
+  renderSteps();
+  if (moveFocus) {
+    const h = document.querySelector(`#step-${step} [data-step-title]`);
+    if (h) { h.focus({ preventScroll: true }); window.scrollTo(0, 0); }
+  }
+}
+window.addEventListener('popstate', () => route(false));
+async function route(moveFocus) {
+  const r = parseHash();
+  if (r.region && r.region !== state.region) await loadRegion(r.region);
+  show(r.step, r.way, moveFocus);
 }
 
-// ---------------------------------------------------------------- sections
+// ---------------------------------------------------------------- header and footer
 function renderHeader() {
   const bn = language() === 'bn';
   setHTML($('top'), `
-    <div class="brand"><b>${esc(BRAND.name)}</b><h1>${T('Rotation Lab')}</h1></div>
+    <div class="brand"><b>${esc(BRAND.name)}</b><h1 class="h1">${T('Your field, year by year')}</h1></div>
     <div class="top-actions">
       <div class="seg" role="group" aria-label="${esc(t('Language'))}">
-        <button type="button" data-act="lang" data-v="en" data-fid="lang-en" aria-pressed="${!bn}" lang="en">EN</button>
         <button type="button" data-act="lang" data-v="bn" data-fid="lang-bn" aria-pressed="${bn}" lang="bn">বাংলা</button>
-      </div>
-      <a class="btn" href="./">${T('Back to the game')}</a>
-    </div>`);
-  document.title = `${BRAND.name} · ${t('Rotation Lab')}`;
-}
-
-function renderRegion() {
-  setHTML($('sec-region'), `
-    <div class="card">
-      <h2 class="h2" id="h-region">${T('Where is your field?')}</h2>
-      <div class="regions">${REGIONS.map((r) => `
-        <button type="button" class="region" data-act="region" data-v="${r}" data-region="${r}" data-fid="region-${r}" aria-pressed="${state.region === r}">${T(REGION_NAMES[r])}</button>`).join('')}
+        <button type="button" data-act="lang" data-v="en" data-fid="lang-en" aria-pressed="${!bn}" lang="en">English</button>
       </div>
     </div>`);
+  document.title = `${BRAND.name} · ${t('Your field, year by year')}`;
 }
 
-function renderField() {
-  const ids = uniqueCrops(regionRotations());
-  const pressed = (list, id) => list.includes(id);
-  setHTML($('sec-field'), `
-    <div class="card">
-      <h2 class="h2" id="h-field">${T('Your field')}</h2>
-      <p class="q">${T('What is your soil?')}</p>
-      <div class="choices" role="group" aria-label="${esc(t('What is your soil?'))}">${SOIL_CHOICES.map(([v, label]) => `
-        <button type="button" class="chip" data-act="soil" data-v="${v}" data-fid="soil-${v || 'none'}" aria-pressed="${state.soil === v}">${T(label)}</button>`).join('')}
-      </div>
-      <p class="tiny faint" style="margin-top:6px">${T('Your soil, as you told us')}</p>
-      <p class="q">${T('Can you irrigate in the dry season?')}</p>
-      <div class="choices" role="group" aria-label="${esc(t('Can you irrigate in the dry season?'))}">
-        <button type="button" class="chip" data-act="irrigate" data-v="1" data-fid="irr-yes" aria-pressed="${state.canIrrigate}">${T('Yes')}</button>
-        <button type="button" class="chip" data-act="irrigate" data-v="0" data-fid="irr-no" aria-pressed="${!state.canIrrigate}">${T('No')}</button>
-      </div>
-      <button type="button" class="disc" data-act="toggle" data-k="limits" data-fid="disc-limits" aria-expanded="${!!state.open.limits}" aria-controls="pn-limits">${T('My limits')}</button>
-      <div class="disc-body" id="pn-limits" ${state.open.limits ? '' : 'hidden'}>
-        <p class="small muted">${T('Tick what does not work for you. A rotation that needs it stays on the list, marked, and ranks last.')}</p>
-        ${ids.map((id) => `
-        <div class="limit-row"><b>${esc(cropName(id))}</b>
-          <div class="choices">
-            <button type="button" class="chip stop" data-act="limit" data-kind="cannotSell" data-crop="${esc(id)}" data-fid="ls-${esc(id)}" aria-pressed="${pressed(state.cannotSell, id)}">${T('Cannot sell')}</button>
-            <button type="button" class="chip stop" data-act="limit" data-kind="noMachine" data-crop="${esc(id)}" data-fid="lm-${esc(id)}" aria-pressed="${pressed(state.noMachine, id)}">${T('No machine')}</button>
-          </div>
-        </div>`).join('')}
-      </div>
-    </div>`);
+function renderFooter() {
+  const c = climate();
+  const facts = c ? dataFacts(c) : null;
+  const data = facts
+    ? `<p>${F('Weather: {}, {} to {}, at {}, {}. Downloaded {}.', t(facts.source), facts.first, facts.last, facts.lat, facts.lon, facts.fetched ? date(facts.fetched) : '-')}</p>`
+    : '';
+  $('foot').innerHTML = `
+    <p>${T('This is a simple model on NASA weather. You know your field better.')} ${T('Ask your extension officer before you change crops.')}</p>
+    ${data}
+    <p>${T('NASA POWER: weather records NASA builds from satellites and models, for every place on Earth, every day since 1981.')}
+      ${T('Each number covers a square about 50 km wide.')}</p>
+    <p><a href="./">${T('Back to the game')}</a></p>`;
 }
 
-function whatIfReadouts() {
-  return {
-    rain: F('Rain: {}%', signed(state.rainPct)),
-    heat: F('Heat: {} °C', signed(state.tempC)),
-  };
-}
-function renderWhatIf() {
-  const r = whatIfReadouts();
-  setHTML($('sec-whatif'), `
-    <div class="card">
-      <button type="button" class="disc" style="margin-top:0" data-act="toggle" data-k="whatif" data-fid="disc-whatif" aria-expanded="${!!state.open.whatif}" aria-controls="pn-whatif">${T('What if? Not a forecast')}</button>
-      <div class="disc-body" id="pn-whatif" ${state.open.whatif ? '' : 'hidden'}>
-        <p class="small muted">${T('This changes the past NASA weather to test your options. It does not say what will happen.')}</p>
-        <div class="slider"><label for="in-rain">${T('Rain change')}</label><output id="out-rain" for="in-rain">${r.rain}</output>
-          <input type="range" id="in-rain" data-act="whatif" data-key="rainPct" min="-40" max="20" step="10" value="${state.rainPct}" /></div>
-        <div class="slider"><label for="in-heat">${T('Hotter')}</label><output id="out-heat" for="in-heat">${r.heat}</output>
-          <input type="range" id="in-heat" data-act="whatif" data-key="tempC" min="0" max="3" step="0.5" value="${state.tempC}" /></div>
-      </div>
-    </div>`);
+function stepMark(n) {
+  return `<p class="step-no">${F('Step {} of {}', n, 4)}</p>`;
 }
 
-function renderPrio() {
-  setHTML($('sec-prio'), `
-    <div class="card">
-      <h2 class="h2" id="h-prio">${T('What matters most to you?')}</h2>
-      <p class="small muted">${T('Move the sliders. The cards below re-order.')}</p>
-      ${PRIORITIES.map((p) => `
-      <div class="slider"><label for="pr-${p.key}">${T(p.label)}</label><output id="po-${p.key}" for="pr-${p.key}">${esc(num(state.prio[p.key]))}</output>
-        <input type="range" id="pr-${p.key}" data-act="prio" data-key="${p.key}" min="0" max="100" step="5" value="${state.prio[p.key]}" /></div>`).join('')}
-    </div>`);
+function statusHTML() {
+  if (state.status === 'loading') return `<p class="status">${T('Reading the NASA weather records…')}</p>`;
+  if (state.status === 'missing') return `<p class="status warn">${T('We do not have the weather for this place yet.')}</p>`;
+  if (state.status === 'error') return `<p class="status warn">${T('Something went wrong. Please open the page again.')}</p>`;
+  return '';
 }
 
-function renderStatus() {
-  const el = $('status');
-  if (state.status === 'loading') el.innerHTML = `<p class="status">${T('Loading NASA data…')}</p>`;
-  else if (state.status === 'missing') el.innerHTML = `<p class="status warn">${T('NASA data for this region has not been downloaded yet')}</p>`;
-  else if (state.status === 'error') el.innerHTML = `<p class="status warn">${T('Something went wrong. Please reload the page.')}</p>`;
-  else el.innerHTML = '';
+// ---------------------------------------------------------------- step 1: where
+function renderWhere() {
+  return `${stepMark(1)}
+    <h2 class="h2" id="h-where" tabindex="-1" data-step-title>${T('Where is your field?')}</h2>
+    <p class="lede">${T('We look back at past NASA weather. We see how each way of planting would have done.')}</p>
+    <div class="regions" role="group" aria-labelledby="h-where">${REGIONS.map((r) => `
+      <button type="button" class="region" data-act="region" data-v="${r}" data-region="${r}" data-fid="region-${r}" aria-pressed="${state.region === r && results.items.length > 0}">${T(REGION_NAMES[r])}</button>`).join('')}
+    </div>`;
 }
 
-function renderHeadline() {
-  const el = $('sec-head');
-  const ex = results.items.find((i) => i.rotation.existing);
-  if (state.status !== 'ready' || !ex) { el.innerHTML = ''; return; }
-  const h = headline(ex.result, `“${t(ex.rotation.label)}”`);
-  el.innerHTML = `<div class="card headline"><p>${F(h.text, ...h.vals)}</p>
-    <p class="tiny muted">${T('This is the pattern farmers use now, replayed on past NASA weather.')}</p></div>`;
+// ---------------------------------------------------------------- step 2: what the satellite saw
+function renderSaw() {
+  const ex = existing();
+  const head = `${stepMark(2)}
+    <h2 class="h2" id="h-saw" tabindex="-1" data-step-title>${T('What the satellite saw')}</h2>`;
+  if (state.status !== 'ready' || !ex) return head + statusHTML();
+  const safer = saferWay(results.items);
+  const fd = finding(ex.result, {
+    word: cropWord(ex.rotation),
+    saferName: safer ? `“${t(safer.rotation.label)}”` : null,
+    saferFailed: safer?.result.summary.failedYears ?? 0,
+  });
+  const facts = dataFacts(climate());
+  const what = [...new Set(ex.rotation.slots.map((s) => s.crop))].map(cropShort).join(' + ');
+  const sat = [
+    { text: 'NASA POWER · {}-{}', vals: [facts.first, facts.last] },
+    { text: '{}, {}', vals: [what, t(REGION_NAMES[state.region])] },
+    ...fd.sat,
+  ];
+  return `${head}
+    <p class="small muted">${F('What you grow now: {}', t(ex.rotation.label))}</p>
+    <div class="sat" role="group" aria-label="${esc(t('What the satellite saw'))}">
+      ${sat.map((l) => `<p>${lineText(l)}</p>`).join('')}
+      ${fd.safer ? `<p class="sat-last">${T('Someone is listening.')}</p>` : ''}
+    </div>
+    <div class="say">${fd.say.map((l) => `<p>${lineText(l)}</p>`).join('')}</div>
+    <div class="step-actions">
+      <button type="button" class="btn primary" data-act="go" data-v="ways" data-fid="to-ways">${T(fd.safer ? 'Show me the safer way' : 'Show me other ways to plant')}</button>
+      <button type="button" class="btn" data-act="go" data-v="where" data-fid="to-where">${T('Change place')}</button>
+    </div>`;
 }
 
-function detailHTML(item, year) {
-  const y = item.result.years.find((r) => r.year === year);
-  if (!y) return '';
-  return `<h4>${F('Year {}', year)}</h4><ul>${y.slots.map((s) => {
-    const name = cropName(s.crop);
-    if (s.lost) return `<li>${F('{}: lost to flood', name)}</li>`;
-    return `<li>${F('{}: {}% of its well-watered potential', name, pct(s.yieldIndex))} · ${F('Water shortage {} mm', Math.round(s.gapMm))}</li>`;
-  }).join('')}</ul>`;
+// ---------------------------------------------------------------- step 3: other ways to plant
+function whyLine(row, idx) {
+  const item = itemById(row.id);
+  if (item.rotation.conflict) return T('Last, because you said it will not work for you.');
+  if (idx === 0) return T(row.top === 'safety' && isFlood() ? WHY_RANK.safetyFlood : WHY_RANK[row.top]);
+  return T(WHY_LOW[weakest(row, state.prio)]);
 }
-
-// For a card below first place, say what holds it back: the priority where it gives up the most score.
-const WHY_LOW = {
-  safety: 'It ranks lower mostly because it loses the crop in more years.',
-  yield: 'It ranks lower mostly because it brings in less harvest.',
-  water: 'It ranks lower mostly because it needs more irrigation water.',
-  soil: 'It ranks lower mostly because it does less for the soil.',
-};
+// For a card below first place, what holds it back: the priority where it gives up the most score.
 function weakest(row, prio) {
   const keys = Object.keys(WHY_LOW).filter((k) => !(row.flat || []).includes(k));
   if (!keys.length) return 'safety';
@@ -177,97 +192,196 @@ function weakest(row, prio) {
   return worst;
 }
 
-const YEAR_LABEL = { lost: 'Lost crop', poor: 'Poor year', fair: 'Fair year', good: 'Good year' };
+const YEAR_LABEL = { lost: 'Lost to flood', poor: 'Thin year', fair: 'Fair year', good: 'Good year' };
+const cameHome = (item) => {
+  const s = item.result.summary;
+  return F('{} of {} years, the {} came home.', s.n - s.failedYears, s.n, t(cropWord(item.rotation)));
+};
+function stripHTML(item, interactive) {
+  const years = item.result.years;
+  const picked = state.picked[item.id];
+  const cells = years.map((y) => {
+    const c = yearClass(y);
+    const label = esc(num(y.year) + ': ' + t(YEAR_LABEL[c]));
+    return interactive
+      ? `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(item.id)}" data-year="${y.year}" data-fid="yr-${esc(item.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${label}"><span></span></button>`
+      : `<span class="yr yr-${c}"><span></span></span>`;
+  }).join('');
+  return `<div class="strip"${interactive ? ` role="group" aria-label="${esc(t('Year by year'))}"` : ' aria-hidden="true"'}>${cells}</div>
+    <div class="strip-ends" aria-hidden="true"><span>${esc(num(years[0]?.year ?? ''))}</span><span>${esc(num(years[years.length - 1]?.year ?? ''))}</span></div>`;
+}
+const legendHTML = () => `<div class="legend" aria-hidden="true">${['good', 'fair', 'poor', 'lost'].map((c) => `<span><i class="yr-${c}"></i>${T(YEAR_LABEL[c])}</span>`).join('')}</div>`;
 
-function evidenceHTML(item, baseline, row) {
-  const ev = evidenceFor(item, baseline, crops, climate(), row?.conflict ? null : row?.top);
-  const block = (title, lines) => (lines.length ? `<div><h4>${T(title)}</h4><ul>${lines.join('')}</ul></div>` : '');
-  const why = ev.why.map((l) => `<li>${lineText(l)}</li>`);
-  const evid = ev.evidence.map((l) => `<li>${lineText(l)}</li>`);
-  let ben = ev.benefits.map((l) => `<li>${lineText(l)}</li>`);
-  if (!ben.length && item.rotation.existing) ben = [`<li>${T('This is what farmers do now. The other options are compared with it.')}</li>`];
+function wayCard(row, idx) {
+  const item = itemById(row.id);
+  const { rotation } = item;
+  return `<li class="card rot${rotation.existing ? ' existing' : ''}${rotation.conflict ? ' conflict' : ''}">
+    <button type="button" class="way" data-act="open" data-v="${esc(row.id)}" data-fid="way-${esc(row.id)}">
+      <span class="rot-head">
+        <span class="rank" aria-hidden="true">${esc(num(idx + 1))}</span>
+        <span><span class="h3">${T(rotation.label)}</span>${rotation.existing ? `<span class="badge">${T('What you grow now')}</span>` : ''}</span>
+      </span>
+      <span class="came">${cameHome(item)}</span>
+      ${stripHTML(item, false)}
+      <span class="why">${whyLine(row, idx)}</span>
+      <span class="more">${T('Look closer')}</span>
+    </button>
+  </li>`;
+}
+
+function fieldPanel() {
+  const ids = uniqueCrops(regionRotations());
+  const pressed = (list, id) => list.includes(id);
+  return `
+    <p class="q">${T('What is your soil?')}</p>
+    <div class="choices" role="group" aria-label="${esc(t('What is your soil?'))}">${SOIL_CHOICES.map(([v, label]) => `
+      <button type="button" class="chip" data-act="soil" data-v="${v}" data-fid="soil-${v || 'none'}" aria-pressed="${state.soil === v}">${T(label)}</button>`).join('')}
+    </div>
+    <p class="q">${T('Can you pump water in the dry season?')}</p>
+    <div class="choices" role="group" aria-label="${esc(t('Can you pump water in the dry season?'))}">
+      <button type="button" class="chip" data-act="irrigate" data-v="1" data-fid="irr-yes" aria-pressed="${state.canIrrigate}">${T('Yes')}</button>
+      <button type="button" class="chip" data-act="irrigate" data-v="0" data-fid="irr-no" aria-pressed="${!state.canIrrigate}">${T('No')}</button>
+    </div>
+    <p class="q">${T('Anything that will not work for you?')}</p>
+    <p class="small muted">${T('Tap it. That way stays on the list, but last.')}</p>
+    ${ids.map((id) => `
+    <div class="limit-row"><b>${esc(cropName(id))}</b>
+      <div class="choices">
+        <button type="button" class="chip stop" data-act="limit" data-kind="cannotSell" data-crop="${esc(id)}" data-fid="ls-${esc(id)}" aria-pressed="${pressed(state.cannotSell, id)}">${T('I cannot sell it')}</button>
+        <button type="button" class="chip stop" data-act="limit" data-kind="noMachine" data-crop="${esc(id)}" data-fid="lm-${esc(id)}" aria-pressed="${pressed(state.noMachine, id)}">${T('No machine for it')}</button>
+      </div>
+    </div>`).join('')}`;
+}
+
+function whatIfReadouts() {
+  return { rain: F('Rain: {}%', signed(state.rainPct)), heat: F('Heat: {} °C', signed(state.tempC)) };
+}
+function whatIfPanel() {
+  const r = whatIfReadouts();
+  return `
+    <p class="small muted">${T('We change the past weather and test each way again. This is a guess, not a forecast.')}</p>
+    <div class="slider"><label for="in-rain">${T('Less or more rain')}</label><output id="out-rain" for="in-rain">${r.rain}</output>
+      <input type="range" id="in-rain" data-act="whatif" data-key="rainPct" min="-40" max="20" step="10" value="${state.rainPct}" /></div>
+    <div class="slider"><label for="in-heat">${T('Hotter')}</label><output id="out-heat" for="in-heat">${r.heat}</output>
+      <input type="range" id="in-heat" data-act="whatif" data-key="tempC" min="0" max="3" step="0.5" value="${state.tempC}" /></div>`;
+}
+
+/** A plain link that opens a panel in place. */
+function sideDoor(key, label, body) {
+  const open = !!state.open[key];
+  return `<div class="side">
+    <button type="button" class="link" data-act="toggle" data-k="${key}" data-fid="disc-${key}" aria-expanded="${open}" aria-controls="pn-${key}">${T(label)}</button>
+    <div class="side-body" id="pn-${key}" ${open ? '' : 'hidden'}>${body}</div>
+  </div>`;
+}
+
+function renderWays() {
+  const head = `${stepMark(3)}
+    <h2 class="h2" id="h-ways" tabindex="-1" data-step-title>${T('Other ways to plant')}</h2>`;
+  if (state.status !== 'ready') return head + statusHTML();
+  results.rows = rankItems(results.items, state.prio);
+  return `${head}
+    <p class="q" id="q-fear">${T('What do you fear most?')}</p>
+    <div class="choices" role="group" aria-labelledby="q-fear">${PRIORITIES.map((p) => `
+      <button type="button" class="chip" data-act="fear" data-v="${p.key}" data-fid="fear-${p.key}" aria-pressed="${state.fear === p.key}">${T(p.label)}</button>`).join('')}
+    </div>
+    ${state.rainPct || state.tempC ? `<p class="status warn">${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</p>` : ''}
+    <ol class="cards">${results.rows.map((row, i) => wayCard(row, i)).join('')}</ol>
+    ${legendHTML()}
+    ${sideDoor('field', 'Tell us about your field', fieldPanel())}
+    ${sideDoor('whatif', 'What if the rain fails? (a guess, not a forecast)', whatIfPanel())}
+    <div class="step-actions">
+      <button type="button" class="btn" data-act="go" data-v="saw" data-fid="to-saw">${T('Back')}</button>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- step 4: one way
+function detailHTML(item, year) {
+  const y = item.result.years.find((r) => r.year === year);
+  if (!y) return '';
+  return `<p class="h4">${esc(num(year))}</p><ul>${y.slots.map((s) => {
+    const name = cropName(s.crop);
+    if (s.lost) return `<li>${F('{}: the flood took it.', name)}</li>`;
+    const gap = Math.round(s.gapMm);
+    return `<li>${F('{}: {}% of a full crop.', name, pct(s.yieldIndex))}${gap > 0 ? ` ${F('Short of water by {} mm.', gap)}` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+
+function evidenceHTML(item, row) {
+  const ev = evidenceFor(item, existing(), crops, climate(), row?.conflict ? null : row?.top);
+  const block = (title, lines) => (lines.length ? `<div><p class="h4">${T(title)}</p><ul>${lines.join('')}</ul></div>` : '');
+  const li = (l) => `<li>${lineText(l)}</li>`;
+  let ben = ev.benefits.map(li);
+  if (!ben.length && item.rotation.existing) ben = [`<li>${T('This is what you grow now. We compare every other way with it.')}</li>`];
   const g = groupGaps(ev.gaps);
   const gaps = [
-    ...g.groups.map((x) => `<li>${F('No sourced value for {} of {}', t(GAP_WORDS[x.param] ?? x.param), x.crops.map((c) => t(c)).join(', '))}</li>`),
+    ...g.groups.map((x) => `<li>${F('Not checked yet: {} ({}).', t(GAP_WORDS[x.param] ?? x.param), x.crops.map((c) => t(c)).join(', '))}</li>`),
     ...uniqueCrops([item.rotation]).filter((id) => crops[id]?.kyProxy).map((id) => `<li>${esc(cropName(id))}: ${T(crops[id].kyProxy)}</li>`),
-    ...g.rest.map((l) => `<li>${lineText(l)}</li>`),
+    ...g.rest.map(li),
   ];
-  const local = ev.localReview.map((l) => `<li>${lineText(l)}</li>`);
   const sources = collectSources(item.rotation, crops).map((s) => {
-    const label = s.crops.length ? `${s.crops.map((c) => t(c)).join(', ')} · ${s.params.map((p) => t(PARAM_WORDS[p] ?? p)).join(', ')}` : t('Cropping pattern');
+    const label = s.crops.length ? `${s.crops.map((c) => t(c)).join(', ')} · ${s.params.map((p) => t(PARAM_WORDS[p] ?? p)).join(', ')}` : t('This way of planting');
     const link = s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : '';
     return `<li><span class="src-for">${esc(label)}</span>${link}${s.rest ? ` <span class="tiny faint">${esc(s.rest)}</span>` : ''}</li>`;
   });
   return `<div class="ev-body">
-    ${block('Why it is suggested', why)}${block('Evidence', evid)}${block('What it may offer', ben)}
-    ${block('What we do not know', gaps)}${block('Ask locally first', local)}
-    <div class="src"><h4>${T('Sources')}</h4><ul>${sources.join('')}</ul></div>
+    ${block('Why we show it', ev.why.map(li))}${block('What the weather record shows', ev.evidence.map(li))}
+    ${block('What it would have given you', ben)}
+    ${block('What we do not know (ask before you plant)', gaps)}${block('Ask near you first', ev.localReview.map(li))}
+    <div class="src"><p class="h4">${T('Where these numbers come from')}</p><ul>${sources.join('')}</ul></div>
   </div>`;
 }
 
-function cardHTML(row, idx, baseline) {
-  const item = results.items.find((i) => i.id === row.id);
-  const { rotation, result } = item;
-  const s = result.summary;
-  const picked = state.picked[row.id];
-  const open = !!state.open['ev:' + row.id];
-  const years = result.years;
-  const why = rotation.conflict
-    ? `<p class="why">${T('It ranks last because it conflicts with what you told us.')}</p>`
-    : (row.top && Object.values(state.prio).some((v) => v > 0) ? `<p class="why">${T(idx === 0 ? WHY_RANK[row.top] : WHY_LOW[weakest(row, state.prio)])}</p>` : '');
+function renderWay() {
+  const item = itemById(state.way);
+  const head = stepMark(4);
+  if (state.status !== 'ready' || !item) return head + statusHTML();
+  const { rotation } = item;
+  const s = item.result.summary;
+  const row = results.rows.find((r) => r.id === item.id) || rankItems(results.items, state.prio).find((r) => r.id === item.id);
+  const idx = results.rows.findIndex((r) => r.id === item.id);
+  const picked = state.picked[item.id];
+  const open = !!state.open['ev:' + item.id];
+  const water = Math.round(s.waterMedianMm);
   const notes = [...(rotation.notModelled || []), ...(rotation.sowNote ? [rotation.sowNote] : [])];
-  return `<li class="card rot${rotation.existing ? ' existing' : ''}${rotation.conflict ? ' conflict' : ''}" data-rot="${esc(row.id)}">
-    <div class="rot-head">
-      <span class="rank" role="img" aria-label="${F('Rank {}', idx + 1)}">${esc(num(idx + 1))}</span>
-      <div><h3>${T(rotation.label)}</h3>${rotation.existing ? `<span class="badge">${T('What farmers do now')}</span>` : ''}</div>
-    </div>
-    ${rotation.share ? `<p class="share">${T(rotation.share)}</p>` : ''}
-    <div>
-      <div class="strip" role="group" aria-label="${esc(t('Year by year results'))}">${years.map((y) => {
-        const c = yearClass(y);
-        return `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(row.id)}" data-year="${y.year}" data-fid="yr-${esc(row.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${esc(num(y.year) + ': ' + t(YEAR_LABEL[c]))}"><span></span></button>`;
-      }).join('')}</div>
-      <div class="strip-ends" aria-hidden="true"><span>${esc(num(years[0]?.year ?? ''))}</span><span>${esc(num(years[years.length - 1]?.year ?? ''))}</span></div>
-    </div>
-    <div class="legend" aria-hidden="true">${['good', 'fair', 'poor', 'lost'].map((c) => `<span><i style="background:var(--${c === 'good' ? 'good' : c === 'fair' ? 'fair' : c === 'poor' ? 'poor' : 'bad'})"></i>${T(YEAR_LABEL[c])}</span>`).join('')}</div>
-    <div class="yr-detail" id="yd-${esc(row.id)}" aria-live="polite" ${picked ? '' : 'hidden'}>${picked ? detailHTML(item, picked) : ''}</div>
-    <p class="came">${F('Came through {} of {} years', s.n - s.failedYears, s.n)}</p>
-    <dl class="tiles">
-      <div class="tile"><dt>${T('Harvest')}</dt><dd>${F('{} of {} crops a year', oneDecimal(s.harvestMedian), s.crops)}</dd></div>
-      <div class="tile"><dt>${T('Irrigation water')}</dt><dd>${F('{} mm a year', Math.round(s.waterMedianMm))}</dd></div>
-      <div class="tile"><dt>${T('Soil health')}</dt><dd>${F('{} / 100', Math.round(s.soilScore))}<span class="tiny">${T('indicator, not a measurement')}</span></dd></div>
-      <div class="tile"><dt>${T('Bare field')}</dt><dd>${F('{} days a year', s.bareDays)}</dd></div>
-    </dl>
-    ${why}
-    ${rotation.conflict ? `<p class="conflict-note">${F('Conflicts with what you told us: {}', rotation.conflictCrops.map(cropName).join(', '))}</p>` : ''}
-    ${notes.length ? `<div class="notes">${notes.map((n) => `<p>${T(n)}</p>`).join('')}</div>` : ''}
-    <button type="button" class="disc" style="margin-top:0" data-act="toggle" data-k="ev:${esc(row.id)}" data-fid="ev-${esc(row.id)}" aria-expanded="${open}" aria-controls="ev-${esc(row.id)}">${T('Evidence')}</button>
-    <div id="ev-${esc(row.id)}" ${open ? '' : 'hidden'}>${open ? evidenceHTML(item, baseline, row) : ''}</div>
-  </li>`;
+  return `${head}
+    <h2 class="h2" id="h-way" tabindex="-1" data-step-title>${T(rotation.label)}</h2>
+    ${rotation.existing ? `<span class="badge">${T('What you grow now')}</span>` : ''}
+    <p class="small muted">${F('What you grow: {}', [...new Set(rotation.slots.map((x) => x.crop))].map(cropName).join(`${t(', then')} `))}</p>
+    ${rotation.share ? `<p class="small muted">${F('How common here: {}', t(rotation.share))}</p>` : ''}
+    <p class="came">${cameHome(item)}</p>
+    <p class="small muted">${T('Tap a year to see what happened.')}</p>
+    ${stripHTML(item, true)}
+    ${legendHTML()}
+    <div class="yr-detail" id="yd-${esc(item.id)}" aria-live="polite" ${picked ? '' : 'hidden'}>${picked ? detailHTML(item, picked) : ''}</div>
+    <ul class="facts">
+      <li>${s.crops === 1 ? F('In a usual year, {}% of a full crop comes home.', pct(s.harvestMedian)) : F('In a usual year, about {} of {} full crops come home.', oneDecimal(s.harvestMedian), s.crops)}</li>
+      <li>${water >= 1 ? F('Water you must pump: about {} mm a year.', water) : T('No pumped water needed.')}</li>
+      <li>${F('Soil: this way gives {} back to the soil.', t(soilWord(s.soilScore)))} <span class="tiny faint">${T('(our estimate, not a soil test)')}</span></li>
+      <li>${F('Your field lies empty {} days a year.', s.bareDays)}</li>
+    </ul>
+    ${row && idx >= 0 ? `<p class="why">${whyLine(row, idx)}</p>` : ''}
+    ${rotation.conflict ? `<p class="conflict-note">${F('You said this will not work for you: {}', rotation.conflictCrops.map(cropName).join(', '))}</p>` : ''}
+    ${notes.length ? `<div class="notes">${notes.map((n) => `<p>${noteText(n)}</p>`).join('')}</div>` : ''}
+    <button type="button" class="disc" data-act="toggle" data-k="ev:${esc(item.id)}" data-fid="ev-${esc(item.id)}" aria-expanded="${open}" aria-controls="ev-${esc(item.id)}">${T('Show me why')}</button>
+    <div id="ev-${esc(item.id)}" ${open ? '' : 'hidden'}>${open ? evidenceHTML(item, row) : ''}</div>
+    <div class="step-actions">
+      <button type="button" class="btn" data-act="go" data-v="ways" data-fid="to-ways-back">${T('Back to other ways')}</button>
+    </div>`;
 }
 
-function renderCards() {
-  const el = $('cards');
-  if (state.status !== 'ready') { el.innerHTML = ''; return; }
-  results.rows = rankItems(results.items, state.prio);
-  const baseline = results.items.find((i) => i.rotation.existing);
-  setHTML(el, results.rows.map((row, i) => cardHTML(row, i, baseline)).join(''));
+// ---------------------------------------------------------------- draw
+const RENDER = { where: renderWhere, saw: renderSaw, ways: renderWays, way: renderWay };
+function renderSteps() {
+  for (const step of STEPS) {
+    const el = $('step-' + step);
+    const on = step === state.step;
+    el.hidden = !on;
+    if (on) setHTML(el, RENDER[step]());
+    else el.innerHTML = '';
+  }
 }
-
-function renderFooter() {
-  const c = climate();
-  let data = '';
-  if (c) {
-    const d = dataFacts(c);
-    data = `<p>${F('Data: {}, {} to {}. Farm point: {}, {}. Fetched {}.', t(d.source), d.first, d.last, d.lat, d.lon, d.fetched ? date(d.fetched) : '-')} ${T('One NASA POWER grid cell is about 50 km wide.')}</p>`;
-  } else data = `<p>${T('One NASA POWER grid cell is about 50 km wide.')}</p>`;
-  $('foot').innerHTML = `<p>${T('A simplified model on NASA data. It supports your judgement; it does not replace it. Ask your agricultural extension officer before you change crops.')}</p>${data}`;
-}
-
-function renderAll() {
-  renderHeader(); renderRegion(); renderField(); renderWhatIf(); renderPrio();
-  renderStatus(); renderHeadline(); renderCards(); renderFooter();
-}
+function renderAll() { renderHeader(); renderSteps(); renderFooter(); }
 
 // ---------------------------------------------------------------- data flow
 async function getClimate(region) {
@@ -282,7 +396,7 @@ async function getClimate(region) {
   return c;
 }
 
-/** Replay everything for the current region, answers and what-if. Does not re-render the controls. */
+/** Replay everything for the current region, answers and what-if. */
 function recompute() {
   const c = climate();
   if (!c) { state.status = 'missing'; results.items = []; results.rows = []; return; }
@@ -293,44 +407,54 @@ function recompute() {
       whatIf: { rainPct: state.rainPct, tempC: state.tempC },
     });
     results.items = out.items; results.opts = out.opts;
+    results.rows = rankItems(results.items, state.prio);
     state.status = 'ready';
   } catch (e) {
     console.error(e);
-    state.status = 'error'; results.items = [];
+    state.status = 'error'; results.items = []; results.rows = [];
   }
 }
+function refresh() { recompute(); renderSteps(); renderFooter(); }
 
-function refreshResults() {
-  recompute();
-  renderStatus(); renderHeadline(); renderCards(); renderFooter();
-}
-
-async function chooseRegion(region) {
+async function loadRegion(region) {
   const my = ++token;
   state.region = region;
   state.cannotSell = []; state.noMachine = []; state.picked = {};
   Object.keys(state.open).filter((k) => k.startsWith('ev:')).forEach((k) => delete state.open[k]);
-  state.status = 'loading'; results.items = [];
-  renderRegion(); renderField(); renderStatus(); renderHeadline(); renderCards(); renderFooter();
+  state.status = 'loading'; results.items = []; results.rows = [];
+  renderSteps(); renderFooter();
   await getClimate(region);
-  if (my !== token) return;
-  refreshResults();
+  if (my !== token) return false;
+  recompute(); renderFooter();
+  return true;
 }
 
 // ---------------------------------------------------------------- events
 function toggleList(list, id) { const i = list.indexOf(id); if (i < 0) list.push(id); else list.splice(i, 1); }
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   const act = b.dataset.act;
   if (act === 'lang') { if (b.dataset.v !== language()) setLanguage(b.dataset.v); return; }
-  if (act === 'region') { if (b.dataset.v !== state.region) chooseRegion(b.dataset.v); return; }
-  if (act === 'soil') { state.soil = b.dataset.v; renderField(); refreshResults(); return; }
-  if (act === 'irrigate') { state.canIrrigate = b.dataset.v === '1'; renderField(); refreshResults(); return; }
+  if (act === 'region') {
+    const r = b.dataset.v;
+    if (r !== state.region || state.status !== 'ready') {
+      state.region = r; state.status = 'loading'; results.items = []; results.rows = [];
+      go('saw');
+      if (await loadRegion(r)) renderSteps();
+    }
+    else go('saw');
+    return;
+  }
+  if (act === 'go') { go(b.dataset.v); return; }
+  if (act === 'open') { go('way', b.dataset.v); return; }
+  if (act === 'fear') { state.fear = b.dataset.v; state.prio = prioFor(state.fear); renderSteps(); return; }
+  if (act === 'soil') { state.soil = b.dataset.v; refresh(); return; }
+  if (act === 'irrigate') { state.canIrrigate = b.dataset.v === '1'; refresh(); return; }
   if (act === 'limit') {
     toggleList(b.dataset.kind === 'cannotSell' ? state.cannotSell : state.noMachine, b.dataset.crop);
-    renderField(); refreshResults(); return;
+    refresh(); return;
   }
   if (act === 'toggle') {
     const k = b.dataset.k;
@@ -339,11 +463,7 @@ document.addEventListener('click', (e) => {
     const panel = $(b.getAttribute('aria-controls'));
     if (k.startsWith('ev:')) {
       const id = k.slice(3);
-      if (state.open[k]) {
-        const item = results.items.find((i) => i.id === id);
-        const row = results.rows.find((r) => r.id === id);
-        panel.innerHTML = evidenceHTML(item, results.items.find((i) => i.rotation.existing), row);
-      } else panel.innerHTML = '';
+      panel.innerHTML = state.open[k] ? evidenceHTML(itemById(id), results.rows.find((r) => r.id === id)) : '';
     }
     panel.hidden = !state.open[k];
     return;
@@ -351,32 +471,24 @@ document.addEventListener('click', (e) => {
   if (act === 'year') {
     const id = b.dataset.rot, year = Number(b.dataset.year);
     state.picked[id] = state.picked[id] === year ? null : year;
-    const card = b.closest('.rot');
-    card.querySelectorAll('.yr').forEach((n) => n.setAttribute('aria-pressed', String(Number(n.dataset.year) === state.picked[id])));
+    b.closest('.strip').querySelectorAll('.yr').forEach((n) => n.setAttribute('aria-pressed', String(Number(n.dataset.year) === state.picked[id])));
     const box = $('yd-' + id);
-    const item = results.items.find((i) => i.id === id);
-    box.innerHTML = state.picked[id] ? detailHTML(item, state.picked[id]) : '';
+    box.innerHTML = state.picked[id] ? detailHTML(itemById(id), state.picked[id]) : '';
     box.hidden = !state.picked[id];
   }
 });
 
 document.addEventListener('input', (e) => {
   const el = e.target;
-  if (!(el instanceof HTMLInputElement)) return;
-  if (el.dataset.act === 'prio') {
-    state.prio[el.dataset.key] = Number(el.value);
-    $('po-' + el.dataset.key).textContent = num(el.value);
-    renderCards();
-  } else if (el.dataset.act === 'whatif') {
-    state[el.dataset.key] = Number(el.value);          // readout only; the replay runs on release (change)
-    const r = whatIfReadouts();
-    $('out-rain').textContent = r.rain; $('out-heat').textContent = r.heat;
-  }
+  if (!(el instanceof HTMLInputElement) || el.dataset.act !== 'whatif') return;
+  state[el.dataset.key] = Number(el.value);          // readout only; the replay runs on release (change)
+  const r = whatIfReadouts();
+  $('out-rain').textContent = r.rain; $('out-heat').textContent = r.heat;
 });
 document.addEventListener('change', (e) => {
   if (e.target instanceof HTMLInputElement && e.target.dataset.act === 'whatif') {
     state[e.target.dataset.key] = Number(e.target.value);
-    refreshResults();
+    refresh();
   }
 });
 
@@ -388,7 +500,7 @@ async function fetchJson(url) {
 }
 
 async function init() {
-  await loadLanguages();
+  await loadLanguages({ fallback: 'bn' });
   document.documentElement.lang = language();
   onLanguage(() => { renderAll(); });
   renderAll();
@@ -397,9 +509,11 @@ async function init() {
     crops = dataEntries(c); rotationsByRegion = dataEntries(r);
   } catch (e) {
     console.error(e);
-    state.status = 'error'; renderStatus();
+    state.status = 'error'; renderSteps();
     return;
   }
-  await chooseRegion(state.region);
+  const r = parseHash();
+  if (r.region) await loadRegion(r.region);
+  show(r.step, r.way, false);
 }
 init();

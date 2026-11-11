@@ -139,6 +139,34 @@ ul, ol { padding: 0; list-style: none; }
 .ev-body .src li { overflow-wrap: anywhere; }
 .src-for { color: var(--text); display: block; }
 
+/* four-step flow (N1). Structure only; the paper look is N2. */
+.h1 { font-size: var(--fs-t2); line-height: 1.15; letter-spacing: -.02em; font-weight: 700; margin: 0; }
+.step { display: flex; flex-direction: column; gap: 14px; }
+.step [data-step-title]:focus { outline: none; }
+.step-no { color: var(--faint); font-size: var(--fs-cap); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.step .h2 { margin-bottom: 0; }
+.step-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn.primary { background: var(--accent); color: #fff; }
+.sat { background: #000; color: #f5f3e6; border-radius: 4px; padding: 16px; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: var(--fs-sub); line-height: 1.7; text-transform: uppercase; letter-spacing: .04em; overflow-wrap: anywhere; }
+.sat-last { margin-top: 10px; }
+.say { display: flex; flex-direction: column; gap: 6px; }
+.say p { font-size: var(--fs-callout); line-height: 1.5; }
+.way { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; width: 100%; cursor: pointer; }
+.way:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+.way > span { display: block; }
+.h3 { display: block; font-size: var(--fs-callout); font-weight: 700; line-height: 1.3; }
+.more { color: var(--water); font-size: var(--fs-sub); font-weight: 600; }
+span.yr { cursor: default; }
+.legend i.yr-good { background: var(--good); } .legend i.yr-fair { background: var(--fair); }
+.legend i.yr-poor { background: var(--poor); } .legend i.yr-lost { background: var(--bad); }
+.side { border-top: 1px solid var(--hair); padding-top: 8px; }
+.link { background: none; border: 0; padding: 0; min-height: 48px; color: var(--water); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; cursor: pointer; text-align: left; }
+.side-body { padding: 4px 0 8px; }
+.facts { display: flex; flex-direction: column; gap: 6px; }
+.facts li { font-size: var(--fs-body); }
+.h4 { font-size: var(--fs-sub); font-weight: 700; margin-bottom: 4px; }
+.ev-body .h4 { color: var(--crop); }
+
 /* footer */
 .foot { padding-top: 8px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); color: var(--muted); font-size: var(--fs-foot); display: flex; flex-direction: column; gap: 8px; }
 .foot p:first-child { color: var(--text); font-weight: 600; }

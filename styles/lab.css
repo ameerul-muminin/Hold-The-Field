@@ -29,6 +29,8 @@
   --ruled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 6' preserveAspectRatio='none'%3E%3Cpath d='M1 3.4C60 2.6 118 3.9 182 3.1S305 2.4 399 3.5' fill='none' stroke='%23474036' stroke-opacity='.55' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
   /* The pencil cross laid over a lost year. */
   --cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' preserveAspectRatio='none'%3E%3Cpath d='M4 4.5 16 15.5M15.5 4 4.5 16' stroke='%23474036' stroke-width='1.6' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+  /* Bare field: pencil hatching, one stroke direction. */
+  --hatch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-1 9 9 -1M-1 1 1 -1M7 9 9 7' stroke='%23474036' stroke-opacity='.45' stroke-width='1'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
@@ -264,6 +266,30 @@ p, li, dd, .h1, .h2, .h3 { overflow-wrap: break-word; }
 .ev-body li::before { content: ""; position: absolute; left: 2px; top: .85em; width: 7px; height: 1.25px; background: var(--ink-3); }
 .ev-body .src li { overflow-wrap: anywhere; }
 .src-for { color: var(--ink); display: block; }
+
+/* the year on one line (N3): crop bars on a hatched track (hatched = bare field), danger band underneath */
+.cal { display: flex; flex-direction: column; gap: 8px; }
+.cal-months { position: relative; height: 16px; font-size: 12px; color: var(--ink-3); line-height: 16px; }
+.cal-months span { position: absolute; top: 0; white-space: nowrap; }
+.cal-track, .cal-danger { position: relative; width: 100%; }
+.cal-track {
+  height: 40px; border: 1.25px solid var(--ink); border-radius: 2px; overflow: hidden;
+  background: var(--hatch) var(--paper);
+}
+.cal-track i { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--ink-faint); }
+.cal-bar {
+  position: absolute; top: 4px; bottom: 4px; background: var(--home); border: 1px solid var(--ink); border-radius: 2px;
+  font-size: 12px; font-weight: 600; line-height: 30px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-danger { height: 12px; margin-top: -2px; }
+.cal-band { position: absolute; top: 0; bottom: 0; border: 1px solid var(--ink); border-top: 0; border-radius: 0 0 2px 2px; min-width: 3px; }
+.cal-band.flood, .cal-key.flood { background: var(--water); }
+.cal-band.heat, .cal-key.heat { background: var(--dry); }
+.cal-key { border: 1px solid var(--ink-2); }
+.cal-key.crop { background: var(--home); }
+.cal-key.bare { background: var(--hatch) var(--paper); }
+.cal-say { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sub); }
+.cal-dates { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- footer */
 .foot {

@@ -4,7 +4,9 @@ import { perturb } from '../rotation/scenario.js';
 import { replay } from '../rotation/replay.js';
 import { rank } from '../rotation/rank.js';
 import { evidenceCard } from '../rotation/evidence.js';
-import { expand } from '../rotation/climate.js';
+import { expand, seasonSlice } from '../rotation/climate.js';
+import { autoplay } from '../sim/engine.js';
+import { floodConfig } from '../sim/config.js';
 
 export const REGIONS = ['haor', 'barind', 'coast'];
 export const REGION_NAMES = { haor: 'Sunamganj haor', barind: 'Barind Tract', coast: 'Satkhira coast' };
@@ -218,7 +220,7 @@ export function computeAll({ region, rotations, crops, climate, answers = {}, wh
   const clim = rainPct || tempC ? perturb(climate, { rainPct, tempC }) : climate;
   const opts = { ...adj.opts, floodRegion: region === 'haor' };
   const items = adj.rotations.map((rotation) => ({ id: rotation.id, rotation, result: replay(rotation, crops, clim, opts) }));
-  return { opts, items };
+  return { opts, items, clim };
 }
 
 /** Rank rows for the sliders (0..100 each). */
@@ -247,3 +249,102 @@ export function dataFacts(climate) {
 /** Number with at most one decimal, no trailing .0. */
 export const oneDecimal = (x) => String(Math.round(x * 10) / 10);
 export const pct = (x) => Math.round(x * 100);
+
+// ---------------------------------------------------------------- crop calendar (N3)
+// A rotation drawn on a 12-month strip: each crop from sowing to harvest, the rest of the year bare, and the
+// window of danger taken from the weather record (haor: the days the flood took the crop; elsewhere: the months
+// with the most days above the crop's heat limit). Days are day-of-year 0..364 in a non-leap year; a bar that
+// runs past 31 Dec comes back as two segments.
+const DAY_MS = 86400000;
+const REF_YEAR = 2001;
+export const YEAR_DAYS = 365;
+const doyOf = (mmdd) => Math.round((Date.parse(`${REF_YEAR}-${mmdd}T00:00:00Z`) - Date.parse(`${REF_YEAR}-01-01T00:00:00Z`)) / DAY_MS);
+const MONTH_STARTS = Array.from({ length: 12 }, (_, m) => doyOf(`${String(m + 1).padStart(2, '0')}-01`));
+const monthOfDoy = (d) => MONTH_STARTS.filter((s) => s <= d).length - 1;
+const mmddOfDoy = (d) => new Date(Date.parse(`${REF_YEAR}-01-01T00:00:00Z`) + d * DAY_MS).toISOString().slice(5, 10);
+
+/** [start, days] -> segments [{from, to}] (to exclusive, 0..365), split at the year end. */
+function segmentsOf(start, days) {
+  const d = Math.min(days, YEAR_DAYS);
+  return start + d <= YEAR_DAYS ? [{ from: start, to: start + d }] : [{ from: start, to: YEAR_DAYS }, { from: 0, to: start + d - YEAR_DAYS }];
+}
+/** The parts of 0..365 that no segment covers. */
+export function gapsOf(segments) {
+  const cover = new Uint8Array(YEAR_DAYS);
+  for (const s of segments) for (let d = s.from; d < s.to; d++) cover[d] = 1;
+  const out = [];
+  for (let d = 0; d < YEAR_DAYS; d++) {
+    if (cover[d]) continue;
+    const last = out[out.length - 1];
+    if (last && last.to === d) last.to = d + 1; else out.push({ from: d, to: d + 1 });
+  }
+  return out;
+}
+
+/** The day the flood took the crop in one sowing year, as 'YYYY-MM-DD', or null. Same run as season.js. */
+export function floodLossDate(slot, crop, clim, year) {
+  const c = expand(clim);
+  const cfg = floodConfig();
+  const variety = crop.days >= 105 ? 'long' : 'short';
+  const sowIso = `${year}-${slot.sow}`;
+  const i0 = c.indexOf(sowIso);
+  if (i0 < 0) return null;
+  const data = seasonSlice(c, c.dateAt(Math.max(0, i0 - 35)), c.dateAt(Math.min(c.n - 1, i0 + cfg.varieties[variety].fieldDays)));
+  const st = autoplay(data, cfg, 'rahim', variety, sowIso);
+  return st.alive ? null : (st.events.find((e) => e.type === 'loss')?.date ?? null);
+}
+
+/** Days above `limitC` per calendar month, over the crop's own window in every year of the record. */
+export function hotDaysByMonth(slot, crop, clim) {
+  const c = expand(clim);
+  const counts = new Array(12).fill(0);
+  let years = 0;
+  for (let year = c.firstYear; year <= c.lastYear; year++) {
+    const i0 = c.indexOf(`${year}-${slot.sow}`);
+    if (i0 < 0 || c.dateAt(i0).slice(0, 4) !== String(year) || i0 + crop.days > c.n) continue;
+    years++;
+    for (let d = 0; d < crop.days; d++) if (c.tmax[i0 + d] > crop.heatC) counts[Number(c.dateAt(i0 + d).slice(5, 7)) - 1]++;
+  }
+  return { counts, years };
+}
+
+/**
+ * @param {object} item {rotation, result} from computeAll
+ * @param {object} crops crops.json by id
+ * @param {object} clim the climate the replay used (computeAll's `clim`)
+ * @param {{flood?:boolean}} [o] flood: this is the haor, draw the flood window
+ * @returns {{bars:object[], bare:{from:number,to:number}[], bareDays:number, dangers:object[], months:number[]}}
+ *   bars: {crop, days, segments}. dangers: {kind:'flood', crop, years, dates:[{year, date}], from, to} or
+ *   {kind:'heat', crop, limitC, months:[0..11], counts[12], years}; a crop with no sourced limit gets no danger.
+ */
+export function cropCalendar(item, crops, clim, { flood = false } = {}) {
+  const slots = item.rotation.slots;
+  const bars = slots.map((s) => ({ crop: s.crop, days: crops[s.crop].days, segments: segmentsOf(doyOf(s.sow), crops[s.crop].days) }));
+  const bare = gapsOf(bars.flatMap((b) => b.segments));
+  const dangers = [];
+  if (flood) {
+    for (const s of slots.filter((x) => x.flood)) {
+      const dates = [];
+      for (const y of item.result.years) {
+        if (!y.slots.some((r) => r.crop === s.crop && r.lost)) continue;
+        const d = floodLossDate(s, crops[s.crop], clim, y.year);
+        if (d) dates.push({ year: y.year, date: d });
+      }
+      const doys = dates.map((x) => doyOf(x.date.slice(5)));
+      dangers.push({
+        kind: 'flood', crop: s.crop, years: item.result.summary.n, dates,
+        from: doys.length ? Math.min(...doys) : null, to: doys.length ? Math.max(...doys) + 1 : null,
+      });
+    }
+  } else {
+    for (const s of slots) {
+      const limitC = crops[s.crop].heatC;
+      if (limitC == null) continue;
+      const { counts, years } = hotDaysByMonth(s, crops[s.crop], clim);
+      const top = Math.max(...counts);
+      dangers.push({ kind: 'heat', crop: s.crop, limitC, counts, years, months: top > 0 ? counts.map((n, m) => (n === top ? m : -1)).filter((m) => m >= 0) : [] });
+    }
+  }
+  return { bars, bare, bareDays: bare.reduce((n, g) => n + g.to - g.from, 0), dangers, months: MONTH_STARTS };
+}
+export { mmddOfDoy, monthOfDoy };

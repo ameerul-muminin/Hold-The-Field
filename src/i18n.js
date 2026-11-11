@@ -105,6 +105,9 @@ export function date(iso, withYear = true) {
   return num(`${d} ${months[m - 1]}${withYear ? ` ${y}` : ''}`);
 }
 
+/** Short month name, 0 = January. */
+export const monthName = (i) => (lang === 'bn' ? MONTHS_BN : MONTHS_EN)[((i % 12) + 12) % 12];
+
 /** Fill every element that carries data-i18n (text) or data-i18n-title (tooltip) with the current language. */
 export function translateDom(root = document) {
   for (const el of root.querySelectorAll('[data-i18n]')) {

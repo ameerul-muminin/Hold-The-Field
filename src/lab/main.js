@@ -5,12 +5,12 @@
 //   4 way     One way in detail
 // The step lives in the URL hash (#haor/ways, #haor/way/short) so the phone's back button walks back.
 // The numbers come from src/rotation/ through view.js; this file only draws and wires.
-import { loadLanguages, setLanguage, onLanguage, language, t, f, num, date } from '../i18n.js';
+import { loadLanguages, setLanguage, onLanguage, language, t, f, num, date, monthName } from '../i18n.js';
 import { BRAND } from '../brand.js';
 import {
   REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, WHY_LOW, SOIL_CHOICES, CROP_SHORT,
   dataEntries, yearClass, finding, saferWay, cropWord, plain, soilWord, prioFor, groupGaps, collectSources,
-  uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct,
+  uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct, cropCalendar, YEAR_DAYS,
 } from './view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -28,7 +28,7 @@ const state = {
   prio: prioFor('safety'),
   open: {}, picked: {}, status: 'loading',
 };
-const results = { items: [], rows: [], opts: null };
+const results = { items: [], rows: [], opts: null, clim: null };
 window.__lab = { state, results, go: (step, way) => go(step, way) };
 
 let crops = {}, rotationsByRegion = {};
@@ -332,6 +332,49 @@ function evidenceHTML(item, row) {
   </div>`;
 }
 
+// ---------------------------------------------------------------- the year on one line (N3)
+const at = (d) => `${((d / YEAR_DAYS) * 100).toFixed(2)}%`;
+const span = (a, b) => `left:${at(a)};width:${at(b - a)}`;
+const joinList = (xs) => xs.join(`${t(', ')} `);
+
+function calendarHTML(item) {
+  const cal = cropCalendar(item, crops, results.clim || climate(), { flood: isFlood() });
+  const ticks = cal.months.map((d) => `<i style="left:${at(d)}"></i>`).join('');
+  const quarters = [0, 3, 6, 9].map((m) => `<span style="left:${at(cal.months[m])}">${esc(monthName(m))}</span>`).join('');
+  const bars = cal.bars.map((b) => {
+    const big = b.segments.reduce((m, s) => (s.to - s.from > m.to - m.from ? s : m), b.segments[0]);
+    return b.segments.map((s) => `<span class="cal-bar" style="${span(s.from, s.to)}">${s === big ? esc(cropShort(b.crop)) : ''}</span>`).join('');
+  }).join('');
+  const bands = [], lines = [], legend = [];
+  for (const d of cal.dangers) {
+    const name = t(cropWord({ slots: [{ crop: d.crop }] }));
+    if (d.kind === 'flood') {
+      if (!d.dates.length) { lines.push(`<p>${F('In these {} years the flood did not take the {}.', d.years, name)}</p>`); continue; }
+      bands.push(`<span class="cal-band flood" style="${span(d.from, d.to)}"></span>`);
+      legend.push('flood');
+      const ds = d.dates.map((x) => x.date);
+      lines.push(`<p>${F('The flood took the {} between {} and {}.', name, date(ds.reduce((a, b) => (a.slice(5) < b.slice(5) ? a : b)), false), date(ds.reduce((a, b) => (a.slice(5) > b.slice(5) ? a : b)), false))}</p>
+        <ul class="cal-dates">${d.dates.map((x) => `<li>${esc(num(x.year))}: ${esc(date(x.date, false))}</li>`).join('')}</ul>`);
+    } else {
+      const total = d.counts.reduce((a, b) => a + b, 0);
+      if (!d.months.length) { lines.push(`<p>${F('In these {} years, no day went above {} °C for the {}.', d.years, d.limitC, cropShort(d.crop))}</p>`); continue; }
+      for (const m of d.months) bands.push(`<span class="cal-band heat" style="${span(cal.months[m], cal.months[m + 1] ?? YEAR_DAYS)}"></span>`);
+      legend.push('heat');
+      lines.push(`<p>${F('Most hot days for the {}: {}.', cropShort(d.crop), joinList(d.months.map((m) => monthName(m))))} ${F('In {} years, {} days went above {} °C.', d.years, total, d.limitC)}</p>`);
+    }
+  }
+  const key = [['crop', 'In the field'], ['bare', 'Bare field'], ...[...new Set(legend)].map((k) => [k, k === 'flood' ? 'The flood took the crop' : 'Hot days'])];
+  const label = `${t('Your field through the year')}: ${cal.bars.map((b) => cropShort(b.crop)).join(', ')}`;
+  return `<div class="cal">
+    <p class="h4">${T('Your field through the year')}</p>
+    <div class="cal-months" aria-hidden="true">${quarters}</div>
+    <div class="cal-track" role="img" aria-label="${esc(label)}">${ticks}${bars}</div>
+    ${bands.length ? `<div class="cal-danger" aria-hidden="true">${bands.join('')}</div>` : ''}
+    <div class="legend" aria-hidden="true">${key.map(([k, l]) => `<span><i class="cal-key ${k}"></i>${T(l)}</span>`).join('')}</div>
+    <div class="cal-say">${lines.join('')}</div>
+  </div>`;
+}
+
 function renderWay() {
   const item = itemById(state.way);
   const head = stepMark(4);
@@ -354,6 +397,7 @@ function renderWay() {
     ${stripHTML(item, true)}
     ${legendHTML()}
     <div class="yr-detail" id="yd-${esc(item.id)}" aria-live="polite" ${picked ? '' : 'hidden'}>${picked ? detailHTML(item, picked) : ''}</div>
+    ${calendarHTML(item)}
     <ul class="facts">
       <li>${s.crops === 1 ? F('In a usual year, {}% of a full crop comes home.', pct(s.harvestMedian)) : F('In a usual year, about {} of {} full crops come home.', oneDecimal(s.harvestMedian), s.crops)}</li>
       <li>${water >= 1 ? F('Water you must pump: about {} mm a year.', water) : T('No pumped water needed.')}</li>
@@ -406,7 +450,7 @@ function recompute() {
       answers: { soil: state.soil || undefined, canIrrigate: state.canIrrigate, cannotSell: state.cannotSell, noMachine: state.noMachine },
       whatIf: { rainPct: state.rainPct, tempC: state.tempC },
     });
-    results.items = out.items; results.opts = out.opts;
+    results.items = out.items; results.opts = out.opts; results.clim = out.clim;
     results.rows = rankItems(results.items, state.prio);
     state.status = 'ready';
   } catch (e) {

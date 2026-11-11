@@ -433,3 +433,15 @@ Sunflower sown before 15 December, when coastal trials found less salt and more 
 Your field => আপনার জমি
 Harvest => ফলন
 Data: {} => ডেটা: {}
+
+# ---- N3: the year on one line (needs native review)
+Your field through the year => বছরজুড়ে আপনার জমি
+In the field => জমিতে ফসল
+Bare field => খালি জমি
+The flood took the crop => বন্যায় ফসল গেছে
+Hot days => গরমের দিন
+In these {} years the flood did not take the {}. => এই {} বছরে বন্যা {} নেয়নি।
+The flood took the {} between {} and {}. => বন্যা {} নিয়েছে {} থেকে {}-এর মধ্যে।
+In these {} years, no day went above {} °C for the {}. => এই {} বছরে {}-এর জন্য একদিনও {} °C-এর বেশি গরম হয়নি।
+Most hot days for the {}: {}. => {}-এর জন্য সবচেয়ে বেশি গরম দিন: {}।
+In {} years, {} days went above {} °C. => {} বছরে {} দিন {} °C-এর বেশি গরম ছিল।

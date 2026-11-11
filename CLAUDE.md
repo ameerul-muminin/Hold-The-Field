@@ -31,7 +31,7 @@ data. It is built. Tonight's work is `docs/NEXT.md`, in order, one task per sess
 ## Working style (token budget is tight)
 - Read only the files the task names. Do not scan `game/` (Java) or `src/world/` unless the task says so.
 - Use the `test-runner` agent to run tests; it reports failures only.
-- Small commits, one per task: `T3: ET0 and season model`. Never push without being asked.
+- Small commits, one per task: `T3: ET0 and season model`. After each task, push the branch and open (or update) a PR into `rotation-lab`.
 - After each task: tick it in `docs/TASKS.md` and add one line to the AI log table in `docs/AI_USAGE.md`
   (date, model, task, what the AI produced, who reviewed). NASA requires this record.
 - When compacting, keep: the current task id, files changed, failing tests.

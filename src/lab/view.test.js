@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import {
   REGIONS, dataEntries, yearClass, lostYears, finding, saferWay, plain, PLAIN, prioFor, cropWord, soilWord, sourceParts, groupGaps, collectSources,
-  computeAll, rankItems, evidenceFor, uniqueCrops, oneDecimal,
+  computeAll, rankItems, evidenceFor, uniqueCrops, oneDecimal, cropCalendar, gapsOf, hotDaysByMonth, floodLossDate, YEAR_DAYS,
 } from './view.js';
 
 const read = (p) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
@@ -135,4 +135,70 @@ test('no irrigation makes irrigated crops riskier or equal', () => {
   const a = computeAll({ region: 'barind', rotations: rots.barind, crops, climate, answers: { canIrrigate: true } });
   const b = computeAll({ region: 'barind', rotations: rots.barind, crops, climate, answers: { canIrrigate: false } });
   assert.ok(b.items[0].result.summary.failedYears >= a.items[0].result.summary.failedYears);
+});
+
+// ---- crop calendar (N3)
+test('gapsOf returns what the segments leave bare', () => {
+  assert.deepEqual(gapsOf([{ from: 10, to: 20 }]), [{ from: 0, to: 10 }, { from: 20, to: YEAR_DAYS }]);
+  assert.deepEqual(gapsOf([{ from: 0, to: 100 }, { from: 100, to: YEAR_DAYS }]), []);
+  assert.deepEqual(gapsOf([{ from: 5, to: 50 }, { from: 40, to: 60 }]), [{ from: 0, to: 5 }, { from: 60, to: YEAR_DAYS }]);
+});
+
+const hasClimate = (r) => existsSync(new URL(`../../data/climate/${r}.json`, import.meta.url));
+const calFor = (region, id) => {
+  const climate = read(`data/climate/${region}.json`);
+  const out = computeAll({ region, rotations: rots[region], crops, climate });
+  const item = out.items.find((i) => i.id === id);
+  return { out, item, cal: cropCalendar(item, crops, out.clim, { flood: region === 'haor' }) };
+};
+
+test('calendar: a bar that runs past 31 Dec comes back in two parts', { skip: !hasClimate('haor') }, () => {
+  const { cal } = calFor('haor', 'mustard');           // sown 20 Nov, 78 days
+  const [a, b] = cal.bars[0].segments;
+  assert.equal(a.to, YEAR_DAYS);
+  assert.equal(b.from, 0);
+  assert.equal((a.to - a.from) + (b.to - b.from), crops.mustard.days);
+});
+
+test('calendar: bare days are the year minus the bars', { skip: !hasClimate('barind') }, () => {
+  const { cal } = calFor('barind', 'existing');
+  const used = cal.bars.reduce((n, b) => n + b.segments.reduce((m, s) => m + s.to - s.from, 0), 0);
+  assert.equal(cal.bareDays, YEAR_DAYS - used);
+});
+
+test('calendar, haor: flood window comes from the days the flood took the crop', { skip: !hasClimate('haor') }, () => {
+  const { item, cal } = calFor('haor', 'existing');
+  const d = cal.dangers[0];
+  assert.equal(d.kind, 'flood');
+  assert.deepEqual(d.dates.map((x) => x.year), item.result.years.filter((y) => y.slots.some((s) => s.lost)).map((y) => y.year));
+  assert.ok(d.dates.length > 0);
+  for (const x of d.dates) assert.ok(x.date.startsWith(String(x.year)));
+  assert.ok(d.from < d.to);
+  // the window sits inside the crop's own bar
+  const bar = cal.bars[0].segments[0];
+  assert.ok(d.from >= bar.from && d.to <= bar.to);
+});
+
+test('calendar, haor: a year the crop came home has no loss date', { skip: !hasClimate('haor') }, () => {
+  const { item, out } = calFor('haor', 'existing');
+  const ok = item.result.years.find((y) => !y.slots.some((s) => s.lost));
+  assert.equal(floodLossDate(item.rotation.slots[0], crops.boro_long, out.clim, ok.year), null);
+});
+
+test('calendar, elsewhere: heat months match the hot-day counts, and no limit means no danger', { skip: !hasClimate('barind') }, () => {
+  const { item, out, cal } = calFor('barind', 'existing');
+  const boro = cal.dangers.find((d) => d.crop === 'boro_long');
+  const { counts } = hotDaysByMonth(item.rotation.slots[0], crops.boro_long, out.clim);
+  assert.deepEqual(boro.counts, counts);
+  assert.ok(boro.months.length > 0 && boro.months.every((m) => counts[m] === Math.max(...counts)));
+  // mustard has no sourced heat limit: nothing is drawn for it
+  const m = calFor('barind', 'mustard_boro');
+  assert.ok(!m.cal.dangers.some((d) => d.crop === 'mustard'));
+});
+
+test('calendar, elsewhere: no hot days means no window', { skip: !hasClimate('coast') }, () => {
+  const { cal } = calFor('coast', 'existing');
+  const aman = cal.dangers.find((d) => d.crop === 't_aman');
+  assert.equal(aman.counts.reduce((a, b) => a + b, 0), 0);
+  assert.deepEqual(aman.months, []);
 });

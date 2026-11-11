@@ -1,0 +1,167 @@
+{
+ "_about": "Rotations compared in the Rotation Lab. Patterns and area shares are from the 2014-15 cropping-pattern surveys in Bangladesh Rice Journal 21(2) (Nasim et al. 2017 and regional papers). Sow dates are trial dates or assumptions and need local review. Collected with AI help on 11 Nov 2026, not yet reviewed by the team's research lead.",
+ "haor": [
+  {
+   "id": "existing",
+   "existing": true,
+   "label": "Boro - Fallow - Fallow",
+   "share": "39.6% of the Sylhet region's cropped area; 45-88% in Sunamganj upazilas",
+   "slots": [
+    {
+     "crop": "boro_long",
+     "sow": "01-05",
+     "flood": true
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38211/25995",
+   "sowNote": "Transplanting in the first week of January (trial date)."
+  },
+  {
+   "id": "short",
+   "label": "Short-duration boro - Fallow - Fallow",
+   "share": null,
+   "slots": [
+    {
+     "crop": "boro_short",
+     "sow": "01-05",
+     "flood": true
+    }
+   ],
+   "source": "https://ricetoday.irri.org/?p=28299",
+   "sowNote": "Same transplanting date, a variety that ripens about three weeks earlier."
+  },
+  {
+   "id": "mustard",
+   "label": "Mustard, then deepwater Aman",
+   "share": "0.35% of the Sylhet region (Mustard - B. Aman)",
+   "slots": [
+    {
+     "crop": "mustard",
+     "sow": "11-20"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38211/25995",
+   "notModelled": [
+    "Deepwater (broadcast) Aman rice is not modelled"
+   ],
+   "sowNote": "Sowing date is an assumption: it depends on when the haor water leaves the field."
+  }
+ ],
+ "barind": [
+  {
+   "id": "existing",
+   "existing": true,
+   "label": "Boro - Fallow - T. Aman",
+   "share": "22.8% of the Rajshahi region",
+   "slots": [
+    {
+     "crop": "boro_long",
+     "sow": "01-05"
+    },
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38209/25993"
+  },
+  {
+   "id": "aman_only",
+   "label": "Fallow - Fallow - T. Aman",
+   "share": "2.8% of the Rajshahi region",
+   "slots": [
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38209/25993"
+  },
+  {
+   "id": "lentil",
+   "label": "Lentil - Fallow - T. Aman",
+   "share": "0.6% of the Rajshahi region; the survey recommends lentil for single T. Aman land",
+   "slots": [
+    {
+     "crop": "lentil",
+     "sow": "11-25"
+    },
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38209/25993",
+   "sowNote": "Lentil sown in the last week of November (https://repo.mel.cgiar.org/items/2a84853a-e525-4533-b568-53ba48795b9e/full)."
+  },
+  {
+   "id": "mustard_boro",
+   "label": "Mustard - Boro - T. Aman",
+   "share": "3.7% of the Rajshahi region",
+   "slots": [
+    {
+     "crop": "mustard",
+     "sow": "11-12"
+    },
+    {
+     "crop": "boro_short",
+     "sow": "02-01"
+    },
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38209/25993",
+   "sowNote": "Mustard and late boro dates are assumptions fitted between the Aman harvest and the next Aman."
+  }
+ ],
+ "coast": [
+  {
+   "id": "existing",
+   "existing": true,
+   "label": "Fallow - Fallow - T. Aman",
+   "share": "26.8% of the Khulna region; the most common pattern in 17 of 25 upazilas",
+   "slots": [
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38207/25991"
+  },
+  {
+   "id": "boro",
+   "label": "Boro - Fallow - T. Aman",
+   "share": "about a third of Satkhira's cropped area (approximate)",
+   "slots": [
+    {
+     "crop": "boro_long",
+     "sow": "01-05"
+    },
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38207/25991"
+  },
+  {
+   "id": "sunflower",
+   "label": "Sunflower - Fallow - T. Aman",
+   "share": "0.14% of the Khulna region",
+   "slots": [
+    {
+     "crop": "sunflower",
+     "sow": "12-05"
+    },
+    {
+     "crop": "t_aman",
+     "sow": "07-25"
+    }
+   ],
+   "source": "https://banglajol.info/index.php/BRJ/article/download/38207/25991",
+   "sowNote": "Sunflower sown before 15 December, when coastal trials found less salt and more yield (https://library.dpird.wa.gov.au/fc_researchart/148)."
+  }
+ ]
+}

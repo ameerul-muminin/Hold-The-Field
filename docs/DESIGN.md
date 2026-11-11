@@ -11,21 +11,34 @@ Design for Hashem; the judge will respect that.
 
 ## The look: our film, not a dashboard
 
-Our video is a pencil world where colour appears only when it means something. The Lab must look like the same hand.
+Taken from frames of our own prescreening film (`Agrocene_FINAL_1080p.mp4`), not invented. The Lab must look like
+the film's title cards and its "NOW / NOVEMBER" notebook slide (3:20), because that is our hand.
 
-- **Paper, not glass.** Warm paper background `#f6f1e7`, ink text `#1d1b17`, pencil-grey rules `#b9b2a3`.
-  A light page is readable in sunlight; the dark theme is not. No blur, no gradients, no drop shadows.
-- **Colour only for meaning.** Blue = water and flood. Green = the crop came home. Ochre = a thin year.
-  Red = crop lost. Brown = dry soil. Nothing else is coloured. No blue "accent" buttons.
-- **A field notebook.** Ruled lines between sections instead of floating cards. Square-ish corners (4 px).
-  Buttons look like ink-outlined boxes; the chosen one is filled with ink.
-- **Type.** Bangla first. `Hind Siliguri` for text (400, 600), `Tiro Bangla` for the one big headline;
-  system fonts as fallback so it still works if fonts fail. Body 17 px, line-height 1.65 (Bangla needs the room).
-  English uses the same families' Latin glyphs.
-- **Drawings.** If Zawad has pencil drawings (Hashem, the hut, rice, satellite), use them as small inline images
-  (each under 15 KB). If not, use no illustration at all rather than icon-pack icons or emoji.
-- **One question per screen.** Not one long page. Flow: (1) Where is your field? (2) The headline: what 25 years
-  say about what you grow now. (3) Other ways to plant, side by side. (4) One rotation in detail.
+- **Paper.** Background `#f5f3e6` (title-card paper); a slightly darker sheet `#ede6d4` for inset panels.
+  Ink `#474036` for text and lines (the film's pencil is warm dark brown, never pure black).
+  A light page is also what reads in sunlight. No blur, no gradients, no glass.
+- **Colour is a wash, and only where it means something** (all sampled from the film, soft and chalky):
+  water / flood `#85a99d` and `#9aabac`; crop came home `#91a87c`; a thin year `#9d9975`;
+  dry or tired soil `#a78b70`; region tints haor `#a9baae`, Barind `#987c61`. Lost crop = the flood wash laid
+  over the square, plus a pencil cross, not a bright red. Nothing else is coloured. No blue accent buttons.
+- **Pencil boxes.** Panels are drawn like the film's diagram boxes (2:40): a thin ink outline, a second faint
+  offset line, 2-3 px corners, no shadow. Section breaks are a hand-ruled line. Selected = filled with ink, paper text.
+- **Lettering.** The film uses rough brush capitals for titles (AGROCENE, NOW, BARIND) and a handwritten script for
+  notes. Ask Zawad which fonts the film used and use those for Latin headings and labels; if unknown, pick the
+  closest open fonts and show him. Bangla body text stays in a clean, highly legible face (`Hind Siliguri`),
+  17 px, line-height 1.65: a farmer must read it easily; style is for headings only. System fallbacks always.
+- **The satellite's voice.** The film opens on black with monospace capitals typed out
+  ("NASA POWER · DAILY RAINFALL ... NO ONE IS LISTENING.") and closes with "SOMEONE IS LISTENING."
+  The Lab's headline finding uses exactly this device: a black panel, monospace, typed line by line:
+  `NASA POWER · 2001-2025` / `BORO RICE, SUNAMGANJ HAOR` / `LOST TO FLOOD: 5 OF 25 YEARS` /
+  `2004 2010 2016 2017 2022` / then, when the safer way of planting is shown, `SOMEONE IS LISTENING.`
+  All numbers come from the replay, never typed in by hand. This is the only dark element on the page.
+- **Drawings.** Reuse the film's own art where it helps (Hashem's hand with seed at 1:20, the torn calendar at 1:28,
+  the three-region map at 1:36). Exported small (each under 20 KB). No icon packs, no emoji.
+- **The map is the region picker.** The film's hand-drawn Bangladesh with Barind, Haor and Coast (1:36) is how the
+  farmer picks a region: tap the wash. Plain buttons underneath for accessibility and small phones.
+- **One question per screen.** Flow: (1) Where is your field? (the map) (2) The satellite's finding about what
+  you grow now. (3) Other ways to plant, side by side. (4) One of them in detail.
   "Your field" questions and "What if" live behind one plain link each, not in the main path.
 - **Bangla is the default language.** English is the toggle.
 

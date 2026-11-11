@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "python3 -m http.server 5173",
     "test": "node --test",
-    "calibrate": "node scripts/calibrate.mjs data/haor-2017.json"
+    "calibrate": "node scripts/calibrate.mjs data/haor-2017.json",
+    "build-lab": "node scripts/build-lab.mjs"
   },
   "license": "MIT"
 }

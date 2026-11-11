@@ -11,7 +11,10 @@ import {
   REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, WHY_LOW, SOIL_CHOICES, CROP_SHORT,
   dataEntries, yearClass, finding, saferWay, cropWord, plain, soilWord, prioFor, groupGaps, collectSources,
   uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct, cropCalendar, YEAR_DAYS, memoryAgreement, GOOD_AT, FAIR_AT,
+  failedYearList,
 } from './view.js';
+import { itemsFromPre, needsClimate } from './pre.js';
+import { smsHref, liteHref } from './lite.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -41,11 +44,12 @@ function saveMemory() {
   try { localStorage.setItem(memoryKey(), JSON.stringify(state.memory)); } catch { /* private window: it just will not be kept */ }
 }
 
-const results = { items: [], rows: [], opts: null, clim: null };
+const results = { items: [], rows: [], opts: null, clim: null, pre: null };   // pre: the precomputed region the items came from, or null
 window.__lab = { state, results, go: (step, way) => go(step, way) };
 
 let crops = {}, rotationsByRegion = {};
 const climates = new Map();      // region -> climate | null (missing)
+const pres = new Map();          // region -> precomputed default answer | null (data/lab/<region>.json, a few KB)
 let token = 0;
 
 // ---------------------------------------------------------------- helpers
@@ -119,17 +123,24 @@ function renderHeader() {
 }
 
 function renderFooter() {
-  const c = climate();
-  const facts = c ? dataFacts(c) : null;
+  const facts = currentFacts();
+  const sample = results.pre?.sample ?? climate()?.sample;
   const data = facts
-    ? `<p>${F('Weather: {}, {} to {}, at {}, {}. Downloaded {}.', t(facts.source), facts.first, facts.last, facts.lat, facts.lon, facts.fetched ? date(facts.fetched) : '-')}</p>`
+    ? `<p>${F('Weather: {}, {} to {}, at {}, {}. Downloaded {}.', t(facts.source), facts.first, facts.last, facts.lat, facts.lon, facts.fetched ? date(facts.fetched) : '-')}${sample ? ` <b class="badge">${T('SAMPLE DATA  -  real NASA data not loaded yet')}</b>` : ''}</p>`
     : '';
   $('foot').innerHTML = `
     <p>${T('This is a simple model on NASA weather. You know your field better.')} ${T('Ask your extension officer before you change crops.')}</p>
     ${data}
     <p>${T('NASA POWER: weather records NASA builds from satellites and models, for every place on Earth, every day since 1981.')}
       ${T('Each number covers a square about 50 km wide.')}</p>
-    <p><a href="./">${T('Back to the game')}</a></p>`;
+    <p>${state.status === 'ready' ? `<a href="${esc(liteHref(state.region))}">${T('Light version for small phones')}</a> · ` : ''}<a href="./">${T('Back to the game')}</a></p>`;
+}
+
+/** Facts for the weather line: from the precomputed file if that is what we drew, else from the climate file. */
+function currentFacts() {
+  if (results.pre?.facts) return results.pre.facts;
+  const c = climate();
+  return c ? dataFacts(c) : null;
 }
 
 function stepMark(n) {
@@ -165,7 +176,7 @@ function renderSaw() {
     saferName: safer ? `“${t(safer.rotation.label)}”` : null,
     saferFailed: safer?.result.summary.failedYears ?? 0,
   });
-  const facts = dataFacts(climate());
+  const facts = currentFacts();
   const what = [...new Set(ex.rotation.slots.map((s) => s.crop))].map(cropShort).join(' + ');
   const sat = [
     { text: 'NASA POWER · {}-{}', vals: [facts.first, facts.last] },
@@ -330,6 +341,53 @@ function memoryPanel(ex) {
     ${m.answered ? `<button type="button" class="link small" data-act="mem-clear" data-fid="mem-clear">${T('Clear my answers')}</button>` : ''}`;
 }
 
+// ---- small phones (N5): the message for a button phone, the light page, and the one-page print
+function sharePanel() {
+  const sms = results.pre?.sms;
+  const link = (text, lang, label) => `<p class="sms" lang="${lang}">${esc(text)}</p>
+    <a class="btn" href="${esc(smsHref(text))}">${T('Send by SMS')} (${T(label)})</a>`;
+  return `<p class="small muted">${T('The phone in your hand may not open a website. A short message still reaches you. Your extension officer can send it or read it out.')}</p>
+    ${sms ? `${link(sms.bn, 'bn', 'Bangla letters')}${link(sms.en, 'en', 'English letters')}` : ''}
+    <div class="step-actions">
+      <button type="button" class="btn" data-act="print" data-fid="print">${T('Print one page for the extension officer')}</button>
+      <a class="btn" href="${esc(liteHref(state.region))}">${T('Light version for small phones')}</a>
+    </div>`;
+}
+
+/** One page for the extension officer. Hidden on screen; lab.css shows only this when printing. */
+function renderPrint() {
+  const el = $('print-sheet');
+  const ex = existing();
+  if (state.status !== 'ready' || !ex) { el.innerHTML = ''; return; }
+  const safer = saferWay(results.items);
+  const fd = finding(ex.result, {
+    word: cropWord(ex.rotation),
+    saferName: safer ? `“${t(safer.rotation.label)}”` : null,
+    saferFailed: safer?.result.summary.failedYears ?? 0,
+  });
+  const facts = currentFacts();
+  const rows = rankItems(results.items, state.prio).map((r) => itemById(r.id));
+  const sms = results.pre?.sms;
+  el.innerHTML = `<h1>${esc(BRAND.name)} · ${T('Your field, year by year')}</h1>
+    <p><b>${T(REGION_NAMES[state.region])}</b> · ${T('For the extension officer')}</p>
+    ${state.rainPct || state.tempC ? `<p><b>${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</b></p>` : ''}
+    <p>${F('Ways of planting, tested on {} years of NASA weather', ex.result.summary.n)}</p>
+    <table>
+      <thead><tr><th>${T('Way of planting')}</th><th>${T('Years the crop came home')}</th><th>${T('Empty days a year')}</th><th>${T('Pumped water, mm a year')}</th><th>${T('Hardest years')}</th></tr></thead>
+      <tbody>${rows.map((it) => {
+    const s = it.result.summary, bad = failedYearList(it.result);
+    return `<tr><td>${T(it.rotation.label)}${it.rotation.existing ? `<br><i>${T('What you grow now')}</i>` : ''}</td>
+        <td>${esc(num(`${s.n - s.failedYears} / ${s.n}`))}</td><td>${esc(num(s.bareDays))}</td><td>${esc(num(Math.round(s.waterMedianMm)))}</td>
+        <td>${bad.length ? esc(num(bad.join(', '))) : '-'}</td></tr>`;
+  }).join('')}</tbody>
+    </table>
+    <h2>${T('What the satellite saw')}</h2>
+    ${fd.say.map((l) => `<p>${lineText(l)}</p>`).join('')}
+    ${sms ? `<h2>${T('By SMS, for a button phone')}</h2><p lang="bn">${esc(sms.bn)}</p><p lang="en">${esc(sms.en)}</p>` : ''}
+    <p class="print-small">${T('This is a simple model on NASA weather. You know your field better.')} ${T('Ask your extension officer before you change crops.')}</p>
+    ${facts ? `<p class="print-small">${F('Weather: {}, {} to {}, at {}, {}. Downloaded {}.', t(facts.source), facts.first, facts.last, facts.lat, facts.lon, facts.fetched ? date(facts.fetched) : '-')}</p>` : ''}`;
+}
+
 function renderWays() {
   const head = `${stepMark(3)}
     <h2 class="h2" id="h-ways" tabindex="-1" data-step-title>${T('Other ways to plant')}</h2>`;
@@ -345,6 +403,7 @@ function renderWays() {
     ${legendHTML()}
     ${sideDoor('field', 'Tell us about your field', fieldPanel())}
     ${sideDoor('whatif', 'What if the rain fails? (a guess, not a forecast)', whatIfPanel())}
+    ${sideDoor('share', 'Send by SMS or print', sharePanel())}
     <div class="step-actions">
       <button type="button" class="btn" data-act="go" data-v="saw" data-fid="to-saw">${T('Back')}</button>
     </div>`;
@@ -362,8 +421,16 @@ function detailHTML(item, year) {
   }).join('')}</ul>`;
 }
 
+/** The evidence card. From the precomputed file when the items came from it (only the "why" line depends on the fear). */
+function evidenceOf(item, row) {
+  const topKey = row?.conflict ? null : row?.top;
+  if (!item.evidence) return evidenceFor(item, existing(), crops, climate(), topKey);
+  const top = PRIORITIES.find((p) => p.key === topKey)?.short ?? null;
+  return { ...item.evidence, why: top ? [{ text: 'Serves your {} priority best', vals: [top] }] : [] };
+}
+
 function evidenceHTML(item, row) {
-  const ev = evidenceFor(item, existing(), crops, climate(), row?.conflict ? null : row?.top);
+  const ev = evidenceOf(item, row);
   const block = (title, lines) => (lines.length ? `<div><p class="h4">${T(title)}</p><ul>${lines.join('')}</ul></div>` : '');
   const li = (l) => `<li>${lineText(l)}</li>`;
   let ben = ev.benefits.map(li);
@@ -393,7 +460,7 @@ const span = (a, b) => `left:${at(a)};width:${at(b - a)}`;
 const joinList = (xs) => xs.join(`${t(', ')} `);
 
 function calendarHTML(item) {
-  const cal = cropCalendar(item, crops, results.clim || climate(), { flood: isFlood() });
+  const cal = item.calendar || cropCalendar(item, crops, results.clim || climate(), { flood: isFlood() });
   const ticks = cal.months.map((d) => `<i style="left:${at(d)}"></i>`).join('');
   const quarters = [0, 3, 6, 9].map((m) => `<span style="left:${at(cal.months[m])}">${esc(monthName(m))}</span>`).join('');
   const bars = cal.bars.map((b) => {
@@ -480,6 +547,7 @@ function renderSteps() {
     if (on) setHTML(el, RENDER[step]());
     else el.innerHTML = '';
   }
+  renderPrint();
 }
 function renderAll() { renderHeader(); renderSteps(); renderFooter(); }
 
@@ -496,8 +564,37 @@ async function getClimate(region) {
   return c;
 }
 
-/** Replay everything for the current region, answers and what-if. */
+async function getPre(region) {
+  if (pres.has(region)) return pres.get(region);
+  let p = null;
+  try {
+    const res = await fetch(`data/lab/${region}.json`);
+    if (res.ok) p = await res.json();
+  } catch { p = null; }
+  pres.set(region, p);
+  return p;
+}
+
+/** Fetch what the current answers need: the precomputed file always, the climate file only when it cannot cover them. */
+async function loadData(region) {
+  await getPre(region);
+  if (needsClimate(state) || !itemsFromPre(pres.get(region), rotationsByRegion[region] || [], crops)) await getClimate(region);
+}
+
+/** Show the region's items: the precomputed answer if it covers the farmer's answers, else a replay on the climate file. */
 function recompute() {
+  results.pre = null;
+  const answers = { soil: state.soil || undefined, canIrrigate: state.canIrrigate, cannotSell: state.cannotSell, noMachine: state.noMachine };
+  if (!needsClimate(state)) {
+    const pre = pres.get(state.region);
+    const items = itemsFromPre(pre, regionRotations(), crops, answers);
+    if (items) {
+      results.items = items; results.opts = null; results.clim = null; results.pre = pre;
+      results.rows = rankItems(items, state.prio);
+      state.status = 'ready';
+      return;
+    }
+  }
   const c = climate();
   if (!c) { state.status = 'missing'; results.items = []; results.rows = []; return; }
   try {
@@ -514,7 +611,16 @@ function recompute() {
     state.status = 'error'; results.items = []; results.rows = [];
   }
 }
-function refresh() { recompute(); renderSteps(); renderFooter(); }
+/** An answer changed. Show the buttons now; if the replay needs the climate file, fetch it once, then replay. */
+async function refresh() {
+  const my = ++token, region = state.region;
+  renderSteps();
+  if (needsClimate(state) && !climates.has(region)) {
+    await getClimate(region);
+    if (my !== token) return;
+  }
+  recompute(); renderSteps(); renderFooter();
+}
 
 async function loadRegion(region) {
   const my = ++token;
@@ -523,7 +629,7 @@ async function loadRegion(region) {
   Object.keys(state.open).filter((k) => k.startsWith('ev:')).forEach((k) => delete state.open[k]);
   state.status = 'loading'; results.items = []; results.rows = [];
   renderSteps(); renderFooter();
-  await getClimate(region);
+  await loadData(region);
   if (my !== token) return false;
   recompute(); renderFooter();
   return true;
@@ -547,6 +653,7 @@ document.addEventListener('click', async (e) => {
     else go('saw');
     return;
   }
+  if (act === 'print') { window.print(); return; }
   if (act === 'go') { go(b.dataset.v); return; }
   if (act === 'open') { go('way', b.dataset.v); return; }
   if (act === 'fear') { state.fear = b.dataset.v; state.prio = prioFor(state.fear); renderSteps(); return; }

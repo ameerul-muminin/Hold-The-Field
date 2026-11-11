@@ -467,3 +467,25 @@ The most this crop gives in a year with enough water. We do not count kilos. => 
 What is mm? => মিমি মানে কী?
 mm is millimetres of water over the whole field. 10 mm is 1 cm. => মিমি মানে পুরো জমির ওপর মিলিমিটার পানি। ১০ মিমি মানে ১ সেমি।
 What is NASA POWER? => NASA POWER কী?
+
+# ---- N5 small phones: lite pages, SMS, print (unreviewed, needs native review)
+{}: in {} years, {} had no bad year. Ask your extension officer. => {}: {} বছরের মধ্যে {} একটি বছরও খারাপ যেত না। কৃষি কর্মকর্তাকে জিজ্ঞেস করুন।
+{}: in {} years, {} had {} bad years. We found no safer way. Ask your extension officer. => {}: {} বছরের মধ্যে {} খারাপ যেত {} বছর। এর চেয়ে নিরাপদ উপায় পাইনি। কৃষি কর্মকর্তাকে জিজ্ঞেস করুন।
+{}: in {} years, {} had {} bad years. {}: {} years. Ask your extension officer. => {}: {} বছরের মধ্যে {} খারাপ যেত {} বছর। {}: {} বছর। কৃষি কর্মকর্তাকে জিজ্ঞেস করুন।
+Safest first. We look back at past NASA weather and see how each way of planting would have done. => নিরাপদটি আগে। আমরা আগের NASA-র আবহাওয়া দেখি, আর দেখি চাষের প্রতিটি ধরন কেমন চলত।
+By SMS, for a button phone => বাটন ফোনের জন্য এসএমএস
+The phone in your hand may not open a website. A short message still reaches you. Your extension officer can send it or read it out. => আপনার হাতের ফোনে ওয়েবসাইট নাও খুলতে পারে। ছোট একটি বার্তা তবু আপনার কাছে পৌঁছায়। কৃষি কর্মকর্তা এটি পাঠাতে বা পড়ে শোনাতে পারেন।
+Send by SMS => এসএমএসে পাঠান
+Bangla letters => বাংলা হরফ
+English letters => ইংরেজি হরফ
+Open the full page => পুরো পাতা খুলুন
+Send by SMS or print => এসএমএসে পাঠান বা ছাপুন
+Print one page for the extension officer => কৃষি কর্মকর্তার জন্য এক পাতা ছাপুন
+Light version for small phones => ছোট ফোনের জন্য হালকা সংস্করণ
+For the extension officer => কৃষি কর্মকর্তার জন্য
+Ways of planting, tested on {} years of NASA weather => চাষের ধরন, {} বছরের NASA আবহাওয়ায় পরীক্ষা করা
+Way of planting => চাষের ধরন
+Years the crop came home => যত বছর ফসল ঘরে উঠেছে
+Empty days a year => বছরে খালি দিন
+Pumped water, mm a year => সেচের পানি, বছরে মিমি
+Hardest years => সবচেয়ে কঠিন বছর

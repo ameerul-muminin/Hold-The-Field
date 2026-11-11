@@ -46,11 +46,13 @@ export function replay(rotation, crops, climate, opts = {}) {
       year,
       slots: slots.map(({ crop, yieldIndex: y, gapMm, lost }) => ({ crop, yieldIndex: y, gapMm, lost })),
       yieldIndex,
+      harvest: slots.reduce((s, r) => s + r.yieldIndex, 0),   // crop-seasons brought home this year
       waterMm: slots.reduce((s, r) => s + r.waterMm, 0),
       failed: slots.some((r) => r.lost) || yieldIndex < 0.5,
     });
   }
   const ys = sortedCopy(years.map((y) => y.yieldIndex));
+  const hs = sortedCopy(years.map((y) => y.harvest));
   const ws = sortedCopy(years.map((y) => y.waterMm));
   const worstYears = years.slice().sort((a, b) => a.yieldIndex - b.yieldIndex || a.year - b.year).slice(0, 3).map((y) => y.year);
   return {
@@ -58,6 +60,7 @@ export function replay(rotation, crops, climate, opts = {}) {
     summary: {
       n: years.length,
       median: percentile(ys, 0.5), p10: percentile(ys, 0.1), p90: percentile(ys, 0.9),
+      harvestMedian: percentile(hs, 0.5), crops: rotation.slots.length,
       failedYears: years.filter((y) => y.failed).length,
       waterMedianMm: percentile(ws, 0.5),
       bareDays: bareDays(rotation, crops),

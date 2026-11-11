@@ -4,7 +4,7 @@ const KEYS = ['safety', 'yield', 'water', 'soil'];
 
 const metrics = (s) => ({
   safety: s.n ? 1 - s.failedYears / s.n : 0,
-  yield: s.median ?? 0,
+  yield: s.harvestMedian ?? s.median ?? 0,   // crop-seasons harvested a year, so an extra crop counts
   water: s.waterMedianMm ?? 0,
   soil: s.soilScore ?? 0,
 });

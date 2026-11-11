@@ -445,3 +445,25 @@ The flood took the {} between {} and {}. => বন্যা {} নিয়ে�
 In these {} years, no day went above {} °C for the {}. => এই {} বছরে {}-এর জন্য একদিনও {} °C-এর বেশি গরম হয়নি।
 Most hot days for the {}: {}. => {}-এর জন্য সবচেয়ে বেশি গরম দিন: {}।
 In {} years, {} days went above {} °C. => {} বছরে {} দিন {} °C-এর বেশি গরম ছিল।
+
+# ---- N4: is this what you remember? and one-tap words (needs native review)
+Is this what you remember? => আপনার কি এমনই মনে আছে?
+Was this a bad year for you? => এটা কি আপনার জন্য খারাপ বছর ছিল?
+{}: Was this a bad year for you? => {}: এটা কি আপনার জন্য খারাপ বছর ছিল?
+Tap Yes or No for the years you remember. Skip the rest. => যে বছরগুলো মনে আছে, সেগুলোতে হ্যাঁ বা না চাপুন। বাকিগুলো বাদ দিন।
+Your answers stay on this phone. => আপনার উত্তর শুধু এই ফোনেই থাকে।
+The satellite saw it the same way. => স্যাটেলাইটও একইরকম দেখেছে।
+The satellite saw it differently. => স্যাটেলাইট অন্যরকম দেখেছে।
+You and the satellite agree on {} of {} years. => আপনি আর স্যাটেলাইট একমত {} বছরে, মোট {} বছরের মধ্যে।
+Where we differ, you know your field better. => যেখানে মিল নেই, আপনি আপনার জমি ভালো চেনেন।
+Clear my answers => আমার উত্তর মুছুন
+What do these colours mean? => এই রংগুলোর মানে কী?
+At least {}% of a full crop. => পুরো ফসলের অন্তত {}%।
+{}% to {}% of a full crop. => পুরো ফসলের {}% থেকে {}%।
+Under {}% of a full crop. => পুরো ফসলের {}%-এর কম।
+The flood took the crop. => বন্যা ফসল নিয়ে গেছে।
+What is a full crop? => ‘পুরো ফসল’ মানে কী?
+The most this crop gives in a year with enough water. We do not count kilos. => পর্যাপ্ত পানি পেলে এই ফসল এক বছরে সবচেয়ে বেশি যা দেয়। আমরা কেজি গুনি না।
+What is mm? => মিমি মানে কী?
+mm is millimetres of water over the whole field. 10 mm is 1 cm. => মিমি মানে পুরো জমির ওপর মিলিমিটার পানি। ১০ মিমি মানে ১ সেমি।
+What is NASA POWER? => NASA POWER কী?

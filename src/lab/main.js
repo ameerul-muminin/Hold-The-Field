@@ -10,7 +10,7 @@ import { BRAND } from '../brand.js';
 import {
   REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, WHY_LOW, SOIL_CHOICES, CROP_SHORT,
   dataEntries, yearClass, finding, saferWay, cropWord, plain, soilWord, prioFor, groupGaps, collectSources,
-  uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct, cropCalendar, YEAR_DAYS,
+  uniqueCrops, computeAll, rankItems, evidenceFor, dataFacts, oneDecimal, pct, cropCalendar, YEAR_DAYS, memoryAgreement, GOOD_AT, FAIR_AT,
 } from './view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +27,20 @@ const state = {
   rainPct: 0, tempC: 0,
   prio: prioFor('safety'),
   open: {}, picked: {}, status: 'loading',
+  memory: loadMemory(),
 };
+// What the farmer remembers lives on this phone only: { region: { year: true|false } }.
+function memoryKey() { return `${BRAND.storageKey}-lab-memory`; }
+function loadMemory() {
+  try {
+    const m = JSON.parse(localStorage.getItem(memoryKey()) || '{}');
+    return m && typeof m === 'object' ? m : {};
+  } catch { return {}; }
+}
+function saveMemory() {
+  try { localStorage.setItem(memoryKey(), JSON.stringify(state.memory)); } catch { /* private window: it just will not be kept */ }
+}
+
 const results = { items: [], rows: [], opts: null, clim: null };
 window.__lab = { state, results, go: (step, way) => go(step, way) };
 
@@ -165,7 +178,9 @@ function renderSaw() {
       ${sat.map((l) => `<p>${lineText(l)}</p>`).join('')}
       ${fd.safer ? `<p class="sat-last">${T('Someone is listening.')}</p>` : ''}
     </div>
+    ${nasaTerm()}
     <div class="say">${fd.say.map((l) => `<p>${lineText(l)}</p>`).join('')}</div>
+    ${sideDoor('memory', 'Is this what you remember?', memoryPanel(ex))}
     <div class="step-actions">
       <button type="button" class="btn primary" data-act="go" data-v="ways" data-fid="to-ways">${T(fd.safer ? 'Show me the safer way' : 'Show me other ways to plant')}</button>
       <button type="button" class="btn" data-act="go" data-v="where" data-fid="to-where">${T('Change place')}</button>
@@ -210,7 +225,7 @@ function stripHTML(item, interactive) {
   return `<div class="strip"${interactive ? ` role="group" aria-label="${esc(t('Year by year'))}"` : ' aria-hidden="true"'}>${cells}</div>
     <div class="strip-ends" aria-hidden="true"><span>${esc(num(years[0]?.year ?? ''))}</span><span>${esc(num(years[years.length - 1]?.year ?? ''))}</span></div>`;
 }
-const legendHTML = () => `<div class="legend" aria-hidden="true">${['good', 'fair', 'poor', 'lost'].map((c) => `<span><i class="yr-${c}"></i>${T(YEAR_LABEL[c])}</span>`).join('')}</div>`;
+const legendHTML = () => `<div class="legend" aria-hidden="true">${['good', 'fair', 'poor', 'lost'].map((c) => `<span><i class="yr-${c}"></i>${T(YEAR_LABEL[c])}</span>`).join('')}</div>${colourTerm()}`;
 
 function wayCard(row, idx) {
   const item = itemById(row.id);
@@ -273,6 +288,46 @@ function sideDoor(key, label, body) {
     <button type="button" class="link" data-act="toggle" data-k="${key}" data-fid="disc-${key}" aria-expanded="${open}" aria-controls="pn-${key}">${T(label)}</button>
     <div class="side-body" id="pn-${key}" ${open ? '' : 'hidden'}>${body}</div>
   </div>`;
+}
+
+/** A word the farmer may not know: one plain link that opens one plain line in place. */
+function term(key, label, body) {
+  const k = 't:' + key, open = !!state.open[k];
+  return `<div class="term">
+    <button type="button" class="link" data-act="toggle" data-k="${k}" data-fid="term-${key}" aria-expanded="${open}" aria-controls="tm-${key}">${T(label)}</button>
+    <div class="term-body" id="tm-${key}" ${open ? '' : 'hidden'}>${body}</div>
+  </div>`;
+}
+const colourTerm = () => term('colours', 'What do these colours mean?', `<ul class="facts">
+    <li><b>${T(YEAR_LABEL.good)}</b>: ${F('At least {}% of a full crop.', pct(GOOD_AT))}</li>
+    <li><b>${T(YEAR_LABEL.fair)}</b>: ${F('{}% to {}% of a full crop.', pct(FAIR_AT), pct(GOOD_AT))}</li>
+    <li><b>${T(YEAR_LABEL.poor)}</b>: ${F('Under {}% of a full crop.', pct(FAIR_AT))}</li>
+    <li><b>${T(YEAR_LABEL.lost)}</b>: ${T('The flood took the crop.')}</li>
+  </ul>`);
+const fullCropTerm = () => term('fullcrop', 'What is a full crop?', `<p>${T('The most this crop gives in a year with enough water. We do not count kilos.')}</p>`);
+const mmTerm = () => term('mm', 'What is mm?', `<p>${T('mm is millimetres of water over the whole field. 10 mm is 1 cm.')}</p>`);
+const nasaTerm = () => term('nasa', 'What is NASA POWER?', `<p>${T('NASA POWER: weather records NASA builds from satellites and models, for every place on Earth, every day since 1981.')}</p>`);
+
+// ---- "Is this what you remember?" (N4): the farmer says which years were bad; we set it beside the replay
+const remembered = () => (state.memory[state.region] ||= {});
+function memoryPanel(ex) {
+  const m = memoryAgreement(ex.result, remembered());
+  const summary = m.answered
+    ? `<p class="say-agree">${F('You and the satellite agree on {} of {} years.', m.agree, m.answered)}</p>${m.agree < m.answered ? `<p class="small muted">${T('Where we differ, you know your field better.')}</p>` : ''}`
+    : '';
+  const q = t('Was this a bad year for you?');
+  return `<p class="small muted">${T('Tap Yes or No for the years you remember. Skip the rest.')} ${T('Your answers stay on this phone.')}</p>
+    <p class="q" id="q-mem">${esc(q)}</p>
+    <div aria-live="polite">${summary}</div>
+    <ul class="mem">${m.rows.map((r) => `<li class="mem-row" role="group" aria-label="${esc(f('{}: Was this a bad year for you?', r.year))}">
+      <b class="mem-year">${esc(num(r.year))}</b>
+      <span class="seg">
+        <button type="button" data-act="mem" data-year="${r.year}" data-v="1" data-fid="mem-${r.year}-y" aria-pressed="${r.said === true}">${T('Yes')}</button>
+        <button type="button" data-act="mem" data-year="${r.year}" data-v="0" data-fid="mem-${r.year}-n" aria-pressed="${r.said === false}">${T('No')}</button>
+      </span>
+      ${r.agree === null ? '' : `<span class="mem-sat tiny muted">${T(r.agree ? 'The satellite saw it the same way.' : 'The satellite saw it differently.')}</span>`}
+    </li>`).join('')}</ul>
+    ${m.answered ? `<button type="button" class="link small" data-act="mem-clear" data-fid="mem-clear">${T('Clear my answers')}</button>` : ''}`;
 }
 
 function renderWays() {
@@ -405,6 +460,7 @@ function renderWay() {
       <li>${F('Your field lies empty {} days a year.', s.bareDays)}</li>
     </ul>
     ${row && idx >= 0 ? `<p class="why">${whyLine(row, idx)}</p>` : ''}
+    ${fullCropTerm()}${water >= 1 ? mmTerm() : ''}
     ${rotation.conflict ? `<p class="conflict-note">${F('You said this will not work for you: {}', rotation.conflictCrops.map(cropName).join(', '))}</p>` : ''}
     ${notes.length ? `<div class="notes">${notes.map((n) => `<p>${noteText(n)}</p>`).join('')}</div>` : ''}
     <button type="button" class="disc" data-act="toggle" data-k="ev:${esc(item.id)}" data-fid="ev-${esc(item.id)}" aria-expanded="${open}" aria-controls="ev-${esc(item.id)}">${T('Show me why')}</button>
@@ -512,6 +568,12 @@ document.addEventListener('click', async (e) => {
     panel.hidden = !state.open[k];
     return;
   }
+  if (act === 'mem') {
+    const year = Number(b.dataset.year), say = b.dataset.v === '1', mine = remembered();
+    if (mine[year] === say) delete mine[year]; else mine[year] = say;   // tap the same answer again to take it back
+    saveMemory(); renderSteps(); return;
+  }
+  if (act === 'mem-clear') { delete state.memory[state.region]; saveMemory(); renderSteps(); return; }
   if (act === 'year') {
     const id = b.dataset.rot, year = Number(b.dataset.year);
     state.picked[id] = state.picked[id] === year ? null : year;

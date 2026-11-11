@@ -291,6 +291,18 @@ p, li, dd, .h1, .h2, .h3 { overflow-wrap: break-word; }
 .cal-say { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sub); }
 .cal-dates { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
+/* is this what you remember? (N4) and one-tap words */
+.mem { display: flex; flex-direction: column; }
+.mem-row { display: grid; grid-template-columns: 56px auto 1fr; align-items: center; gap: 4px 12px; padding: 6px 0; background: var(--ruled) bottom / 100% 6px no-repeat; }
+.mem-row:last-child { background: none; }
+.mem-year { font-variant-numeric: tabular-nums; }
+.mem-sat { min-width: 0; }
+@media (max-width: 420px) { .mem-sat { grid-column: 1 / -1; } }
+.say-agree { font-size: var(--fs-callout); font-weight: 700; }
+.term { display: flex; flex-direction: column; }
+.term .link { font-size: var(--fs-sub); font-weight: 400; }
+.term-body { padding: 0 0 8px; color: var(--ink-2); font-size: var(--fs-sub); }
+
 /* ---------------------------------------------------------------- footer */
 .foot {
   padding-top: 18px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));

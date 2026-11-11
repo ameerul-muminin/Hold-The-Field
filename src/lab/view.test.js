@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import {
   REGIONS, dataEntries, yearClass, lostYears, finding, saferWay, plain, PLAIN, prioFor, cropWord, soilWord, sourceParts, groupGaps, collectSources,
-  computeAll, rankItems, evidenceFor, uniqueCrops, oneDecimal, cropCalendar, gapsOf, hotDaysByMonth, floodLossDate, YEAR_DAYS,
+  computeAll, rankItems, evidenceFor, uniqueCrops, oneDecimal, cropCalendar, gapsOf, hotDaysByMonth, floodLossDate, YEAR_DAYS, memoryAgreement, satelliteBad, GOOD_AT, FAIR_AT,
 } from './view.js';
 
 const read = (p) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
@@ -201,4 +201,31 @@ test('calendar, elsewhere: no hot days means no window', { skip: !hasClimate('co
   const aman = cal.dangers.find((d) => d.crop === 't_aman');
   assert.equal(aman.counts.reduce((a, b) => a + b, 0), 0);
   assert.deepEqual(aman.months, []);
+});
+
+// ---- memory (N4)
+test('memoryAgreement counts only answered years and orders newest first', () => {
+  const years = [
+    { ...y(0, true), year: 2004 }, { ...y(0.9), year: 2005 }, { ...y(0.3), year: 2006 }, { ...y(0.6), year: 2007 },
+  ];
+  const m = memoryAgreement({ years }, { 2004: true, 2005: true, 2006: false, 2007: false, 1999: true });
+  assert.deepEqual(m.rows.map((r) => r.year), [2007, 2006, 2005, 2004]);
+  assert.equal(m.answered, 4);
+  assert.equal(m.agree, 2);                             // 2004 and 2007 match; 2005 and 2006 do not
+  const none = memoryAgreement({ years }, {});
+  assert.equal(none.answered, 0); assert.equal(none.agree, 0);
+  assert.ok(none.rows.every((r) => r.said === null && r.agree === null));
+});
+
+test('satelliteBad: lost or thin is bad, fair and good are not', () => {
+  assert.equal(satelliteBad(y(0.9, true)), true);
+  assert.equal(satelliteBad(y(FAIR_AT - 0.01)), true);
+  assert.equal(satelliteBad(y(FAIR_AT)), false);
+  assert.equal(satelliteBad(y(GOOD_AT)), false);
+});
+
+test('memoryAgreement on the real haor record flags the lost years', { skip: !hasClimate('haor') }, () => {
+  const { item } = calFor('haor', 'existing');
+  const m = memoryAgreement(item.result, {});
+  assert.deepEqual(m.rows.filter((r) => r.bad).map((r) => r.year).sort(), lostYears(item.result).sort());
 });

@@ -106,10 +106,11 @@ export function dataEntries(obj) {
 }
 
 /** 'lost' (any crop lost), 'poor' (< 0.5), 'fair' (< 0.8), else 'good'. */
+export const FAIR_AT = 0.5, GOOD_AT = 0.8;
 export function yearClass(y) {
   if (y.slots.some((s) => s.lost)) return 'lost';
-  if (y.yieldIndex < 0.5) return 'poor';
-  if (y.yieldIndex < 0.8) return 'fair';
+  if (y.yieldIndex < FAIR_AT) return 'poor';
+  if (y.yieldIndex < GOOD_AT) return 'fair';
   return 'good';
 }
 
@@ -348,3 +349,24 @@ export function cropCalendar(item, crops, clim, { flood = false } = {}) {
   return { bars, bare, bareDays: bare.reduce((n, g) => n + g.to - g.from, 0), dangers, months: MONTH_STARTS };
 }
 export { mmddOfDoy, monthOfDoy };
+
+// ---------------------------------------------------------------- "Is this what you remember?" (N4)
+/** Was this a bad year by the replay? Lost to flood or a thin harvest: the same test as the failed-year count. */
+export const satelliteBad = (y) => y.failed ?? ['lost', 'poor'].includes(yearClass(y));
+
+/**
+ * Put the farmer's memory next to the replay.
+ * @param {{years:object[]}} result replay of the farmer's own way of planting
+ * @param {Record<string, boolean>} said year -> true (a bad year for me) / false (not a bad year); missing = no answer
+ * @returns {{rows:{year:number, bad:boolean, said:boolean|null, agree:boolean|null}[], answered:number, agree:number}}
+ *   rows run newest first; only answered years count.
+ */
+export function memoryAgreement(result, said = {}) {
+  const rows = result.years.slice().sort((a, b) => b.year - a.year).map((y) => {
+    const bad = satelliteBad(y);
+    const mine = typeof said[y.year] === 'boolean' ? said[y.year] : null;
+    return { year: y.year, bad, said: mine, agree: mine === null ? null : mine === bad };
+  });
+  const answered = rows.filter((r) => r.said !== null).length;
+  return { rows, answered, agree: rows.filter((r) => r.agree).length };
+}

@@ -204,7 +204,7 @@ function stripHTML(item, interactive) {
     const c = yearClass(y);
     const label = esc(num(y.year) + ': ' + t(YEAR_LABEL[c]));
     return interactive
-      ? `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(item.id)}" data-year="${y.year}" data-fid="yr-${esc(item.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${label}"><span></span></button>`
+      ? `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(item.id)}" data-year="${y.year}" data-fid="yr-${esc(item.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${label}"><span></span><span class="yr-n" aria-hidden="true">${esc(num(String(y.year).slice(2)))}</span></button>`
       : `<span class="yr yr-${c}"><span></span></span>`;
   }).join('');
   return `<div class="strip"${interactive ? ` role="group" aria-label="${esc(t('Year by year'))}"` : ' aria-hidden="true"'}>${cells}</div>

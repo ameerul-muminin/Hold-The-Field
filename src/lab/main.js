@@ -151,7 +151,8 @@ function currentFacts() {
 }
 
 function stepMark(n) {
-  return `<p class="step-no">${F('Step {} of {}', n, 4)}</p>`;
+  const pips = [1, 2, 3, 4].map((i) => `<i${i <= n ? ' class="on"' : ''}></i>`).join('');
+  return `<p class="step-no"><span class="pips" aria-hidden="true">${pips}</span>${F('Step {} of {}', n, 4)}</p>`;
 }
 
 function statusHTML() {
@@ -256,9 +257,9 @@ function renderSaw() {
     ${whatIfNote()}
     ${mineNote()}
     <p class="small muted">${F('What you grow now: {}', t(ex.rotation.label))}</p>
-    <div class="sat" role="group" aria-label="${esc(t('What the satellite saw'))}">
-      ${sat.map((l) => `<p>${lineText(l)}</p>`).join('')}
-      ${fd.safer ? `<p class="sat-last">${T('Someone is listening.')}</p>` : ''}
+    <div class="sat${typedOnce() ? ' typed' : ''}" role="group" aria-label="${esc(t('What the satellite saw'))}">
+      ${sat.map((l, i) => `<p style="--i:${i}">${lineText(l)}</p>`).join('')}
+      ${fd.safer ? `<p class="sat-last" style="--i:${sat.length + 1}">${T('Someone is listening.')}</p>` : ''}
     </div>
     ${nasaTerm()}
     <div class="say">${fd.say.map((l) => `<p>${lineText(l)}</p>`).join('')}</div>
@@ -307,6 +308,13 @@ const cameHome = (item) => {
 // N6, the replay moment: the first time a result is drawn, its squares fill in left to right like years passing.
 // Once per result (region, what-if, way, card or detail), so a re-render after a tap stays still.
 const replayed = new Set();
+/** The satellite's lines type in once per place, like the film's opening; after that they just sit there. */
+function typedOnce() {
+  const k = `sat|${state.region}|${state.mine ? memoryPlace() : ''}|${state.rainPct}|${state.tempC}`;
+  if (replayed.has(k)) return false;
+  replayed.add(k);
+  return true;
+}
 function replayOnce(item, interactive) {
   const k = [state.region, state.mine ? memoryPlace() : '', state.rainPct, state.tempC, state.soil, state.canIrrigate, item.id, interactive ? 'd' : 'c'].join('|');
   if (replayed.has(k)) return false;
@@ -576,7 +584,8 @@ function calendarHTML(item) {
       bands.push(`<span class="cal-band flood" style="${span(d.from, d.to)}"></span>`);
       legend.push('flood');
       const ds = d.dates.map((x) => x.date);
-      lines.push(`<p>${F('The flood took the {} between {} and {}.', name, date(ds.reduce((a, b) => (a.slice(5) < b.slice(5) ? a : b)), false), date(ds.reduce((a, b) => (a.slice(5) > b.slice(5) ? a : b)), false))}</p>
+      const first = ds.reduce((a, b) => (a.slice(5) < b.slice(5) ? a : b)), last = ds.reduce((a, b) => (a.slice(5) > b.slice(5) ? a : b));
+      lines.push(`<p>${first.slice(5) === last.slice(5) ? F('The flood took the {} on {}.', name, date(first, false)) : F('The flood took the {} between {} and {}.', name, date(first, false), date(last, false))}</p>
         <ul class="cal-dates">${d.dates.map((x) => `<li>${esc(num(x.year))}: ${esc(date(x.date, false))}</li>`).join('')}</ul>`);
     } else {
       const total = d.counts.reduce((a, b) => a + b, 0);
@@ -629,7 +638,7 @@ function renderWay() {
       <li>${F('Your field lies empty {} days a year.', s.bareDays)}</li>
     </ul>
     ${row && idx >= 0 ? `<p class="why">${whyLine(row, idx)}</p>` : ''}
-    ${fullCropTerm()}${water >= 1 ? mmTerm() : ''}
+    <div class="terms">${fullCropTerm()}${water >= 1 ? mmTerm() : ''}</div>
     ${rotation.conflict ? `<p class="conflict-note">${F('You said this will not work for you: {}', rotation.conflictCrops.map(cropName).join(', '))}</p>` : ''}
     ${notes.length ? `<div class="notes">${notes.map((n) => `<p>${noteText(n)}</p>`).join('')}</div>` : ''}
     <button type="button" class="disc" data-act="toggle" data-k="ev:${esc(item.id)}" data-fid="ev-${esc(item.id)}" aria-expanded="${open}" aria-controls="ev-${esc(item.id)}">${T('Show me why')}</button>

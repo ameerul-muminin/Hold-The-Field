@@ -99,8 +99,9 @@ export function createHud({ onSlot, onTime, onSpeed, onMenu, onSound, onSatBack 
     const m = st.maturity;
     $('matFill').style.width = `${m * 100}%`;
     $('matFill').classList.toggle('ready', m >= 0.8);
-    $('matText').textContent = f('Rice {}%', Math.round(m * 100));
-    $('matHint').textContent = t(m >= 0.8 ? 'ready to cut' : 'ready at 80%');
+    // after the season is decided the bar says what happened, not "ready to cut"
+    $('matText').textContent = !st.alive ? t('Crop lost') : st.harvested ? f('Harvested {}%', Math.round(st.yieldPct * 100)) : f('Rice {}%', Math.round(m * 100));
+    $('matHint').textContent = !st.alive || st.harvested ? '' : t(m >= 0.8 ? 'ready to cut' : 'ready at 80%');
     $('matHint').style.color = m >= 0.8 ? COLORS.good : '';
     $('coins').innerHTML = `${icon('coin')} ${f('Tk {}', st.coins)}`;
     const slots = $('slots').children;
@@ -182,9 +183,7 @@ export function createHud({ onSlot, onTime, onSpeed, onMenu, onSound, onSatBack 
     if (!show) return;
     const touch = matchMedia('(pointer: coarse)').matches;
     $('promptTitle').textContent = touch ? t('Tap Play to begin the season') : t('Press Space to begin the season');
-    $('promptText').textContent = t(isDrought(s.cfg)
-      ? 'Look around first: drag to turn, scroll or pinch to zoom. Press 3 for the NASA satellite view.'
-      : 'Look around first: drag to turn, scroll or pinch to zoom over the embankment. Press 3 for the NASA satellite view.');
+    $('promptText').textContent = t(touch ? 'Drag to look around.' : 'Drag to look around. Press 3 for the satellite view.');
     $('promptPlay').innerHTML = `${icon('play')} ${t('Start the season')}`;
     $('promptPlay').className = 'btn primary big';
   }
@@ -202,7 +201,7 @@ export function createHud({ onSlot, onTime, onSpeed, onMenu, onSound, onSatBack 
     document.querySelector('.maturity').style.visibility = on ? 'hidden' : '';
     if (on && s) {
       const dry = isDrought(s.cfg);
-      $('satSub').textContent = t(dry ? 'When the rain stops, the soil dries out within days' : 'Rain over the Meghalaya hills reaches the haor about two days later');
+      $('satSub').textContent = t(dry ? 'No rain, dry soil within days' : 'Hill rain reaches the haor in about 2 days');
       $('legendRain').textContent = t(dry ? 'rain intensity' : 'rain intensity (upstream)');
     }
   }

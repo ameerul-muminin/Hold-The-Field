@@ -1,0 +1,208 @@
+{
+ "_about": "Crop parameters for the Rotation Lab. Every value has a source or is null (shown on screen as an information gap). Collected with AI help on 11 Nov 2026 and NOT yet reviewed by the team's research lead. On 12 Nov 2026 an AI (not a field expert) opened every source URL and compared it with the value; see docs/AI_USAGE.md. Days are days in the field (rice: total duration minus seedbed).",
+ "boro_long": {
+  "name": "Long-duration boro rice",
+  "variety": "BRRI dhan29",
+  "family": "cereal",
+  "days": 118,
+  "kc": [
+   1.05,
+   1.2,
+   0.75
+  ],
+  "stageShare": [
+   0.2,
+   0.6,
+   0.2
+  ],
+  "ky": null,
+  "heatC": 35,
+  "legume": false,
+  "irrigated": true,
+  "rootDepth": "medium",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://banglajol.info/index.php/AGRIC/article/view/31347/21090 (160 days total, 40-45 day seedlings)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Rice: 1.05 / 1.20 / 0.90-0.60; end value is the midpoint)",
+   "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Rice, Tropics: 30/30/60/30 of 150 days)",
+   "heatC": "https://arccjournals.com/journal/agricultural-reviews/R-2353 (over 35 C at flowering raises spikelet sterility)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Rice 0.5-1.0 m)",
+   "irrigated": "Assumption: boro is the dry-season irrigated rice crop. Needs a source."
+  },
+  "note": "ky: rice is not in FAO-56 Table 24, so rain-shortage loss uses the default response."
+ },
+ "boro_short": {
+  "name": "Short-duration boro rice",
+  "variety": "BRRI dhan28",
+  "family": "cereal",
+  "days": 98,
+  "kc": [
+   1.05,
+   1.2,
+   0.75
+  ],
+  "stageShare": [
+   0.2,
+   0.6,
+   0.2
+  ],
+  "ky": null,
+  "heatC": 35,
+  "legume": false,
+  "irrigated": true,
+  "rootDepth": "medium",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://ricetoday.irri.org/?p=28299 (140 days total) minus 40-45 day seedlings (https://banglajol.info/index.php/AGRIC/article/view/31347/21090)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Rice: 1.05 / 1.20 / 0.90-0.60; end value is the midpoint)",
+   "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Rice, Tropics: 30/30/60/30 of 150 days)",
+   "heatC": "https://arccjournals.com/journal/agricultural-reviews/R-2353 (over 35 C at flowering raises spikelet sterility)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Rice 0.5-1.0 m)",
+   "irrigated": "Assumption: boro is the dry-season irrigated rice crop. Needs a source."
+  },
+  "note": "ky: rice is not in FAO-56 Table 24, so rain-shortage loss uses the default response."
+ },
+ "t_aman": {
+  "name": "Transplanted Aman rice",
+  "variety": "BRRI dhan71",
+  "family": "cereal",
+  "days": 98,
+  "kc": [
+   1.05,
+   1.2,
+   0.75
+  ],
+  "stageShare": [
+   0.2,
+   0.6,
+   0.2
+  ],
+  "ky": null,
+  "heatC": 35,
+  "legume": false,
+  "irrigated": false,
+  "rootDepth": "medium",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://csa.ru.ac.bd/bjals/Volume3(2022)/v0302202210.pdf (BRRI dhan71 days to maturity 113-122, mean 117.89, with 20-day-old seedlings; the paper does not say whether the count starts at sowing or transplanting; read here as from sowing, so 118 minus 20 seedbed days)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Rice: 1.05 / 1.20 / 0.90-0.60; end value is the midpoint)",
+   "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Rice, Tropics: 30/30/60/30 of 150 days)",
+   "heatC": "https://arccjournals.com/journal/agricultural-reviews/R-2353 (over 35 C at flowering raises spikelet sterility)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Rice 0.5-1.0 m)",
+   "irrigated": "Assumption: T. Aman is mainly rainfed monsoon rice. Needs a source."
+  },
+  "note": "ky: rice is not in FAO-56 Table 24, so rain-shortage loss uses the default response."
+ },
+ "mustard": {
+  "name": "Mustard",
+  "variety": "BARI Sarisha-14",
+  "family": "oilseed",
+  "days": 78,
+  "kc": [
+   0.35,
+   1.075,
+   0.35
+  ],
+  "stageShare": null,
+  "ky": null,
+  "heatC": null,
+  "legume": false,
+  "irrigated": null,
+  "rootDepth": "deep",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://thefinancialexpress.com.bd/national/agriculturists-see-high-prospects-in-interim-bari-sarisa-14-cultivation-1577875632 (75-80 days)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Oil crops ini 0.35; Rapeseed, Canola mid 1.0-1.15, end 0.35)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Rape/Canola 1.0-1.5 m)"
+  }
+ },
+ "lentil": {
+  "name": "Lentil",
+  "variety": "BARI Masur-8",
+  "family": "pulse",
+  "days": 118,
+  "kc": [
+   0.4,
+   1.1,
+   0.3
+  ],
+  "stageShare": [
+   0.13,
+   0.6,
+   0.27
+  ],
+  "ky": 1.15,
+  "kyProxy": "FAO-56 Table 24 lists no lentil; value is the row for Beans and Peas",
+  "heatC": null,
+  "legume": true,
+  "irrigated": null,
+  "rootDepth": "medium",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://repo.mel.cgiar.org/items/2a84853a-e525-4533-b568-53ba48795b9e/full (115-120 days)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Legumes ini 0.4; Lentil mid 1.10, end 0.30)",
+   "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Lentil, Europe: 20/30/60/40 of 150 days)",
+   "ky": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 24, Beans 1.15, Peas 1.15: proxy)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Lentil 0.6-0.8 m)"
+  }
+ },
+ "sunflower": {
+  "name": "Sunflower",
+  "variety": "BARI Surjamukhi-2",
+  "family": "oilseed",
+  "days": 98,
+  "kc": [
+   0.35,
+   1.075,
+   0.35
+  ],
+  "stageShare": [
+   0.19,
+   0.62,
+   0.19
+  ],
+  "ky": 0.95,
+  "heatC": null,
+  "legume": false,
+  "irrigated": null,
+  "rootDepth": "deep",
+  "residue": null,
+  "forage": null,
+  "cover": null,
+  "organicMatter": null,
+  "market": null,
+  "price": null,
+  "source": {
+   "days": "https://dhcrop.bsmrau.net/bari-surjamukhi-2/ (95-100 days in the rabi season)",
+   "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Oil crops ini 0.35; Sunflower mid 1.0-1.15, end 0.35)",
+   "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Sunflower: 25/35/45/25 of 130 days)",
+   "ky": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 24, Sunflower 0.95)",
+   "rootDepth": "https://www.fao.org/4/x0490e/x0490e0e.htm (Table 22, Sunflower 0.8-1.5 m)"
+  }
+ }
+}

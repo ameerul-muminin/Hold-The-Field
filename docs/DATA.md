@@ -79,3 +79,16 @@ The Java test `bundledSeasonFileLoads` checks the story (Rahim loses the crop; a
 ## Sources for crop and flood facts
 
 _Yaminur: add every source here (BRRI variety durations and yield, flood date, submergence tolerance, embankment heights)._
+
+## Rotation Lab data (added 11 Nov 2026)
+
+`data/climate/{haor,barind,coast}.json`: NASA POWER Daily API, community AG, 1 Jan 2001 to 31 Dec 2025, written by
+`data-pipeline/fetch_climate.py`. Columns: `rainFarm`, `rainUp` (PRECTOTCORR at the farm and upstream points), `tmax`
+(T2M_MAX), `tmin` (T2M_MIN), `soil` (GWETROOT), `soilTop` (GWETTOP), `rad` (ALLSKY_SFC_SW_DWN). 9,131 days each,
+0 missing values filled. `"sample": false`.
+
+IMERG probe result (11 Nov 2026): the POWER daily API did not return `IMERG_PRECTOT`, so there is no `rainImerg`
+column and the project makes no GPM claim.
+
+How the Rotation Lab uses the data, its model and its limits: `docs/SPEC.md` and `docs/VALIDATION.md`.
+

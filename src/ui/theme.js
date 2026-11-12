@@ -1,9 +1,9 @@
 // Colours shared by the canvas-drawn parts of the UI (the CSS uses the same values as custom properties).
 // Same palette as the desktop build's ui/Theme.java.
 export const COLORS = {
-  text: '#eef4fb', muted: '#8fa3bc', faint: '#5f7089',
-  accent: '#4da3ff', good: '#5bd18a', warn: '#ffb84d', bad: '#ff5d5d',
-  water: '#58a9e8', crop: '#e6be4b', soil: '#c49a6c', rain: '#7fb8ff', temp: '#ff9a5c', loss: '#cccccc',
+  text: '#f5f7fa', muted: '#a3adbb', faint: '#6b7584',
+  accent: '#0a84ff', good: '#30d158', warn: '#ff9f0a', bad: '#ff453a',
+  water: '#5eb8ff', crop: '#e9c157', soil: '#c79f72', rain: '#7fbcff', temp: '#ff9f5c', loss: '#cccccc',
 };
 
 /** Inline SVG icons (24x24, currentColor). */

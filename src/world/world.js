@@ -4,7 +4,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { noise2, fbm, ridged, rand } from './noise.js';
-import { grassTexture, mudTexture, earthTexture, hillTexture, thatchTexture, plasterTexture, frondTexture, setAnisotropy } from './textures.js';
+import { grassTexture, mudTexture, earthTexture, hillTexture, frondTexture, waterNormalTexture, setAnisotropy } from './textures.js';
+import { buildVillage, HOME, POND } from './village.js';
+import { patchwork, treeline } from './landscape.js';
+import { routes, buildCountryside, fogLayers } from './countryside.js';
 
 export const VS = 1.6;                       // vertical scale: 1 m of water or rice = 1.6 world units
 const FW = 48, FD = 32;                      // rice field size (world units), centred on the origin
@@ -45,6 +48,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   controls.maxPolarAngle = 1.42;
   controls.zoomSpeed = 0.8;
   controls.rotateSpeed = 0.6;
+  // Camera moves are eased and can be interrupted: grabbing the view stops a move where it is.
+  let fly = null;
+  controls.addEventListener('start', () => { fly = null; });
 
   // ---------------------------------------------------------------- sky, light
   const SUN_DIR = new THREE.Vector3(-0.82, 0.5, -0.28).normalize();      // afternoon sun from the west, raking across the field
@@ -107,6 +113,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   scene.add(bursts.points);
   const clouds = makeClouds(mobile ? 14 : 26);
   scene.add(clouds.group);
+  const kuasha = fogLayers(mobile);                // winter morning fog lying over the fields
+  scene.add(kuasha.group);
+  const FOG_COLOR = new THREE.Color('#dfe5e8');
 
   // ---------------------------------------------------------------- rice (one instanced mesh)
   const rice = makeRice(mobile ? 0.74 : 0.52, mobile ? 5 : 7);
@@ -123,10 +132,12 @@ export function createWorld(canvas, { mobile = false } = {}) {
   const view = {
     lakeY: -0.5, fieldWaterY: -0.4, bundH: 0.6 * VS, growth: 0.3, tint: PAL.green.clone(), droop: 0,
     rainFarm: 0, rainUp: 0, storm: 0, dryness: 0, moisture: 0.6, tankFrac: 0.6, harvested: false, ripe: 0,
-    soil: PAL.soilWet.clone(), pose: 'idle', overlay: 0, lightning: 0,
+    soil: PAL.soilWet.clone(), pose: 'idle', overlay: 0, lightning: 0, fogK: 0,
   };
   const target = { ...view, tint: view.tint.clone(), soil: view.soil.clone() };
   let mode = 'title';
+  let started = false;                          // the first title shot is placed, not flown to
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let satT = 0;                                 // 0 = ground camera, 1 = satellite camera
   const savedCam = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
 
@@ -136,6 +147,7 @@ export function createWorld(canvas, { mobile = false } = {}) {
     root.clear();
     for (const p of Object.values(parts)) p.dispose?.();
     parts = hz === 'drought' ? buildDrought(root) : buildFlood(root);
+    sacks.group.position.copy(parts.sackOffset ?? new THREE.Vector3());
     view.lakeY = target.lakeY = -0.5;
     view.fieldWaterY = target.fieldWaterY = -0.4;
     sacks.set(0);
@@ -184,8 +196,14 @@ export function createWorld(canvas, { mobile = false } = {}) {
     }
     target.pose = !st.alive ? 'sad' : st.harvested && st.yieldPct > 0.4 ? 'cheer' : st.status === 'warning' && !st.harvested ? 'warn' : 'idle';
     sacks.set(st.harvested && st.alive ? Math.round(st.yieldPct * 14) : 0);
-    // satellite overlay colours
+    // satellite overlay colours; the neighbours' plots follow the season
     if (parts.setOverlay) parts.setOverlay(day, st, data);
+    if (data?.days?.length) view.season = st.i / (data.days.length - 1);
+    // winter fog follows the NASA record: the colder the day in December-January (haor) or November-December (Barind)
+    const season = view.season ?? 0.3;
+    const winter = dry ? smooth(0.78, 0.92, season) : 1 - smooth(0.22, 0.4, season);
+    target.fogK = winter * Math.max(0, Math.min(1, (28.5 - day.tmax) / 5));
+    if (parts.fields) parts.fields.setSeason(view.season ?? 0.3);
   }
 
   function burst(kind) {
@@ -196,35 +214,47 @@ export function createWorld(canvas, { mobile = false } = {}) {
   }
 
   // ---------------------------------------------------------------- camera modes
+  /** Ease the camera to a new view; instant when asked (first frame) or when the person prefers less motion. */
+  function flyTo(pos, tgt, dur = 1.4, instant = false) {
+    if (instant || reduceMotion.matches) { fly = null; camera.position.copy(pos); controls.target.copy(tgt); return; }
+    fly = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), toPos: pos.clone(), toTarget: tgt.clone(), t: 0, dur };
+    controls.autoRotate = false;
+    controls.maxDistance = 2000;                     // no zoom clamp while flying (satellite height to ground)
+  }
+
   function setMode(m) {
     if (m === mode) return;
+    const first = !started;
     if (m === 'satellite') { savedCam.pos.copy(camera.position); savedCam.target.copy(controls.target); }
-    if (mode === 'satellite' && m !== 'satellite') { camera.position.copy(savedCam.pos); controls.target.copy(savedCam.target); }
+    if (mode === 'satellite' && m !== 'satellite') flyTo(savedCam.pos, savedCam.target, 1.2);
     mode = m;
-    controls.autoRotate = m === 'title';
+    controls.autoRotate = m === 'title' && !fly;
     controls.autoRotateSpeed = 0.35;
-    controls.maxDistance = m === 'satellite' ? 900 : 190;
     controls.maxPolarAngle = m === 'satellite' ? 1.2 : 1.42;
     if (m === 'satellite') {
       const flood = hazard !== 'drought';
-      controls.target.set(flood ? 35 : 0, 0, flood ? -290 : 0);
-      camera.position.set(flood ? 40 : 10, flood ? 850 : 230, flood ? 220 : 110);
-    } else if (m === 'play' || m === 'title') {
-      if (m === 'title') { camera.position.set(60, 26, 70); controls.target.set(0, 4, -40); }
+      flyTo(new THREE.Vector3(flood ? 40 : 10, flood ? 850 : 230, flood ? 220 : 110), new THREE.Vector3(flood ? 35 : 0, 0, flood ? -290 : 0), 1.6);
+    } else if (m === 'title') {
+      flyTo(new THREE.Vector3(60, 26, 70), new THREE.Vector3(0, 4, -40), 1.6, first);
     }
   }
-  function resetCamera() { camera.position.set(44, 20, 52); controls.target.set(0, 0, -6); }
+  function resetCamera() { flyTo(new THREE.Vector3(44, 20, 52), new THREE.Vector3(0, 0, -6), 1.3); }
 
   // ---------------------------------------------------------------- per-frame
   let t = 0, flashT = 0;
   function frame(dt) {
     dt = Math.min(dt, 0.1);
+    started = true;
     t += dt;
     const k = 1 - Math.exp(-dt * 2.6);
-    for (const key of ['lakeY', 'fieldWaterY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac']) {
+    for (const key of ['lakeY', 'bundH', 'growth', 'droop', 'ripe', 'rainFarm', 'rainUp', 'storm', 'dryness', 'moisture', 'tankFrac', 'fogK']) {
       view[key] += (target[key] - view[key]) * k;
     }
+    // the field fills more slowly than the lake rises, so the water is seen pouring over the bund
+    const fill = target.fieldWaterY > view.fieldWaterY ? 0.55 : 2.6;
+    view.fieldWaterY += (target.fieldWaterY - view.fieldWaterY) * (1 - Math.exp(-dt * fill));
     view.tint.lerp(target.tint, k);
+    view.harvested = target.harvested;
     view.soil.lerp(target.soil, k);
     satT += ((mode === 'satellite' ? 1 : 0) - satT) * (1 - Math.exp(-dt * 4));
 
@@ -247,6 +277,16 @@ export function createWorld(canvas, { mobile = false } = {}) {
     skyUniforms.flash.value = flash;
     skyUniforms.sunAmt.value = Math.max(0, 1 - view.storm * 1.3);
     hemi.intensity += flash * 3;
+    // kuasha: on the cold winter days of the record the fields lie under morning fog (never on the title shot)
+    const fk = view.fogK * (1 - satT) * (mode === 'title' ? 0 : 1);
+    if (fk > 0.001) {
+      scene.fog.color.lerp(FOG_COLOR, fk * 0.85);
+      scene.fog.near = scene.fog.near * (1 - fk) + 4 * fk;
+      scene.fog.far = scene.fog.far * (1 - fk) + 290 * fk;
+      skyUniforms.horizon.value.lerp(FOG_COLOR, fk * 0.75);
+      sun.intensity *= 1 - fk * 0.5;
+    }
+    kuasha.update(t, fk);
     envClock += dt;
     if (flash === 0 && envClock > 1.5 && Math.abs(view.storm - envStorm) > 0.08) { envClock = 0; skyUniforms.flash.value = 0; updateEnvironment(view.storm); }
 
@@ -258,8 +298,16 @@ export function createWorld(canvas, { mobile = false } = {}) {
     parts.update?.(t, dt, view, satT);
     rice.mesh.visible = true;
 
+    if (fly) {
+      fly.t = Math.min(1, fly.t + dt / fly.dur);
+      const e = 1 - Math.pow(1 - fly.t, 4);          // ease-out: fast start, long gentle settle
+      camera.position.lerpVectors(fly.fromPos, fly.toPos, e);
+      controls.target.lerpVectors(fly.fromTarget, fly.toTarget, e);
+      if (fly.t >= 1) { fly = null; controls.autoRotate = mode === 'title'; }
+    }
+    if (!fly) controls.maxDistance = mode === 'satellite' ? 900 : 190;
     controls.update();
-    if (mode !== 'satellite') clampTarget();
+    if (mode !== 'satellite' && !fly) clampTarget();
     renderer.render(scene, camera);
   }
 
@@ -282,7 +330,14 @@ export function createWorld(canvas, { mobile = false } = {}) {
 
   /** Lower the resolution if the device is struggling (called by the frame-time monitor). */
   function degrade() {
-    if (pixelRatio <= 0.75) return false;
+    if (pixelRatio <= 0.75) {
+      if (!renderer.shadowMap.enabled) return false;
+      // last step on a struggling device: no shadows
+      renderer.shadowMap.enabled = false;
+      sun.castShadow = false;
+      scene.traverse((o) => { if (o.material) for (const mt of [].concat(o.material)) mt.needsUpdate = true; });
+      return true;
+    }
     pixelRatio = Math.max(0.75, pixelRatio - 0.35);
     renderer.setPixelRatio(pixelRatio);
     resize();
@@ -304,7 +359,9 @@ export function createWorld(canvas, { mobile = false } = {}) {
   }
   const anchors = () => ({ farm: new THREE.Vector3(0, 3, 0), upstream: UP_POINT.clone() });
 
-  return { setScenario, setState, setMode, resetCamera, frame, resize, degrade, pickRahim, project, anchors, burst, get mode() { return mode; } };
+  /** Fly the camera to a shot (test hook and screen recording). */
+  const shot = (pos, tgt, instant = false) => flyTo(new THREE.Vector3(...pos), new THREE.Vector3(...tgt), 1.4, instant);
+  return { setScenario, setState, setMode, resetCamera, frame, resize, degrade, pickRahim, project, anchors, burst, shot, get mode() { return mode; } };
 
   // ================================================================= scenario builders
 
@@ -312,17 +369,24 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const out = {};
     // ground: lowland around the field, lake bed to the north
     const plots = [[-62, 4, 36, 30], [62, 34, 30, 24], [-10, 44, 40, 22]];
-    const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
+    const flats = [...plots, [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8], [POND.x, POND.z, 16, 16]];
+    const heightAt = (x, z) => {
       const lake = smooth(LAKE_EDGE + 1, LAKE_EDGE - 7, z);
-      const flat = flatMask(x, z, plots);
+      const flat = flatMask(x, z, flats);
       const base = 0.1 + fbm(x * 0.02, z * 0.02, 3) * 0.7;
       return (base * (1 - flat) - 0.1 * flat) * (1 - lake) + (-3.2 + fbm(x * 0.01, z * 0.01, 2)) * lake;
-    }, (x, z, y, c) => {
+    };
+    const ground = terrain(1600, 1600, mobile ? 90 : 140, heightAt, (x, z, y, c) => {
       const g = 0.5 + 0.5 * noise2(x * 0.05, z * 0.05), dryPatch = fbm(x * 0.008 + 3, z * 0.008, 3);
       c.setRGB(0.38 + g * 0.07 + dryPatch * 0.16, 0.47 + g * 0.08 + dryPatch * 0.06, 0.25 + g * 0.04);   // olive grass, drier patches
       if (y < -0.6) c.setRGB(0.3, 0.33, 0.27);
     });
     group.add(ground);
+    const groundAt = meshHeight(ground);
+    const rt = routes({ flood: true });
+    out.fields = patchwork(ground.material);
+    const horizon = treeline({ full: false });
+    group.add(horizon);
     // the Meghalaya hills upstream
     const hills = terrain(1800, 520, mobile ? 140 : 240, (x, z) => {
       const rise = smooth(130, -60, z);                  // local z: +260 is the near (south) edge
@@ -335,10 +399,26 @@ export function createWorld(canvas, { mobile = false } = {}) {
     hills.position.set(0, 0, -470);
     group.add(hills);
     // lake water and field water
-    const lake = water(1700, 380, mobile ? 50 : 90, mobile ? 12 : 22, '#2b5b72', 0.94);
-    lake.mesh.position.set(0, -0.5, LAKE_EDGE - 190);
+    // the lake runs right up under the north bund: while it is low the bank hides it, as it rises it creeps up to the bund
+    const lakeSouth = -FD / 2 - 0.3, lakeDepth = 380;
+    const lake = water(1700, lakeDepth, mobile ? 50 : 90, mobile ? 12 : 22, '#2b5b72', 0.94, [70, 16]);
+    lake.mesh.position.set(0, -0.5, lakeSouth - lakeDepth / 2);
     group.add(lake.mesh);
-    const fieldWater = water(FW, FD, 16, 10, '#5b7880', 0.78);
+    // foam where the water presses on the bund, and a sheet of water pouring over it into the field
+    const foam = new THREE.Mesh(new THREE.PlaneGeometry(FW + 4, 1.6), new THREE.MeshBasicMaterial({ color: '#eef6fb', alphaMap: foamTexture(), transparent: true, opacity: 0, depthWrite: false }));
+    foam.rotation.x = -Math.PI / 2;
+    foam.position.set(0, -0.5, -FD / 2 - 1.5);
+    foam.material.alphaMap.wrapS = foam.material.alphaMap.wrapT = THREE.RepeatWrapping;
+    foam.material.alphaMap.repeat.set(8, 1);
+    group.add(foam);
+    const spillTex = spillTexture();
+    const spill = new THREE.Mesh(new THREE.PlaneGeometry(FW, 1, 1, 1), new THREE.MeshBasicMaterial({ color: '#cfe6f2', alphaMap: spillTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    spill.geometry.translate(0, -0.5, 0);           // hangs down from its top edge
+    spill.position.set(0, 0, -FD / 2 + 0.55);
+    spill.rotation.x = -0.35;                        // leaning into the field, like water sliding down the inner face
+    spill.visible = false;
+    group.add(spill);
+    const fieldWater = water(FW, FD, 16, 10, '#5b7880', 0.78, [6, 4]);
     fieldWater.mesh.position.set(0, -0.4, 0);
     group.add(fieldWater.mesh);
     // paddy soil, bund, neighbours, hut, trees, boat
@@ -349,9 +429,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     group.add(soil);
     const bund = makeBund(1.7, false);
     group.add(bund.group);
-    neighbours(group, plots, '#7ea54a');
-    group.add(makeHut(FW / 2 + 12, 9));
-    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 26, -14, 52, 30) && !nearPlot(x, z, plots) && Math.hypot(x, z) < 260);
+    const village = buildVillage(group, { flood: true, mobile, heightAt: groundAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && !rt.near(x, z, r), openLand: (x, z, r) => openLand(x, z, r) && !rt.near(x, z, r) });
+    const country = buildCountryside(group, { routes: rt, groundAt, mobile, flood: true, edges: farmEdges(true) });
+    out.sackOffset = village.sackOffset;
+    trees(group, 60, (x, z) => z > LAKE_EDGE + 4 && !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && !rt.near(x, z, 2) && Math.hypot(x, z) < 260);
     const boat = makeBoat();
     boat.position.set(-30, -0.5, LAKE_EDGE - 30);
     group.add(boat);
@@ -372,8 +453,27 @@ export function createWorld(canvas, { mobile = false } = {}) {
       soilLayer.material.color.copy(new THREE.Color('#c09040').lerp(new THREE.Color('#1a59d9'), day.soil));
     };
     out.update = (time, dt, v, sat) => {
+      village.update(time, dt, v);
+      country.update(time, dt, v, sat);
+      horizon.visible = sat < 0.3;
       lake.mesh.position.y = v.lakeY;
       lake.wave(time, 0.12 + v.storm * 0.25);
+      // water against the bund: foam once it touches, a pouring sheet once it is over the top
+      const touching = smooth(-0.05, 0.25, v.lakeY), over = smooth(0, 0.18, v.lakeY - v.bundH);
+      const pressing = smooth(v.bundH - 0.6, v.bundH, v.lakeY);
+      foam.position.y = v.lakeY + 0.04;
+      foam.material.opacity = touching * (0.25 + 0.55 * pressing) * (1 - sat);
+      foam.material.alphaMap.offset.x = time * 0.02;
+      foam.visible = foam.material.opacity > 0.01;
+      const fieldTop = Math.max(0.02, v.fieldWaterY);
+      const drop = v.bundH - fieldTop;
+      spill.visible = over > 0.01 && drop > 0.08;
+      if (spill.visible) {
+        spill.position.y = v.bundH + 0.05;
+        spill.scale.y = drop / Math.cos(spill.rotation.x);
+        spill.material.opacity = over * 0.85;
+        spillTex.offset.y = time * 1.6;
+      }
       const flooded = v.fieldWaterY > 0.02;
       fieldWater.mesh.visible = flooded;
       fieldWater.mesh.position.y = Math.max(0.02, v.fieldWaterY);
@@ -396,16 +496,22 @@ export function createWorld(canvas, { mobile = false } = {}) {
   function buildDrought(group) {
     const out = {};
     const plots = [[-60, 2, 36, 30], [60, 36, 30, 24], [-8, 46, 42, 22], [8, -48, 46, 28]];
-    const flats = [...plots, [-36, 27, 16, 16]];          // + the village tank
-    const ground = terrain(1600, 1600, mobile ? 90 : 140, (x, z) => {
+    const flats = [...plots, [-36, 27, 16, 16], [HOME.x, HOME.z, HOME.w + 8, HOME.d + 8]];          // + the village tank and the homestead
+    const heightAt = (x, z) => {
       const flat = flatMask(x, z, flats);
       return (0.1 + fbm(x * 0.015, z * 0.015, 3) * 1.4) * (1 - flat) - 0.1 * flat;
-    }, (x, z, y, c) => {
+    };
+    const ground = terrain(1600, 1600, mobile ? 90 : 140, heightAt, (x, z, y, c) => {
       const g = 0.5 + 0.5 * noise2(x * 0.04, z * 0.04);
       const dryPatch = fbm(x * 0.008 + 3, z * 0.008, 3);
       c.setRGB(0.54 + g * 0.08 + dryPatch * 0.08, 0.5 + g * 0.07, 0.3 + g * 0.05);
     });
     group.add(ground);
+    const groundAt = meshHeight(ground);
+    const rt = routes({ flood: false });
+    out.fields = patchwork(ground.material);
+    const horizon = treeline({ full: true });
+    group.add(horizon);
     const soil = new THREE.Mesh(new THREE.PlaneGeometry(FW, FD), new THREE.MeshLambertMaterial({ color: PAL.soilWet, map: mudTexture([6, 4]) }));
     soil.rotation.x = -Math.PI / 2;
     soil.position.y = 0.01;
@@ -422,9 +528,10 @@ export function createWorld(canvas, { mobile = false } = {}) {
     const bund = makeBund(0.9, true);
     bund.setHeight(0.32);
     group.add(bund.group);
-    const nb = neighbours(group, plots, '#8aa04a');
-    group.add(makeHut(FW / 2 + 12, 9));
-    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 26, -14, 56, 36) && !inRect(x, z, -46, 16, -26, 38) && !nearPlot(x, z, plots) && Math.hypot(x, z) < 300, true);
+    const village = buildVillage(group, { flood: false, mobile, heightAt: groundAt, clear: (x, z, r) => clearOfFarm(x, z, r, plots) && Math.hypot(x + 36, z - 27) > r + 14 && !rt.near(x, z, r), openLand: (x, z, r) => openLand(x, z, r) && Math.hypot(x + 36, z - 27) > r + 10 && !rt.near(x, z, r) });
+    const country = buildCountryside(group, { routes: rt, groundAt, mobile, flood: false, edges: farmEdges(false) });
+    out.sackOffset = village.sackOffset;
+    trees(group, 70, (x, z) => !inRect(x, z, -30, -24, 30, 24) && !inRect(x, z, 22, -14, 62, 38) && !inRect(x, z, -46, 16, -26, 38) && Math.abs(x + 34) > 4 && !nearPlot(x, z, plots) && !rt.near(x, z, 2) && Math.hypot(x, z) < 300, true);
     // the village tank
     const tank = makeTank();
     tank.group.position.set(-36, 0, 27);
@@ -439,11 +546,13 @@ export function createWorld(canvas, { mobile = false } = {}) {
     };
     const lush = new THREE.Color('#b9d98a'), parched = new THREE.Color('#ffffff');
     out.update = (time, dt, v, sat) => {
+      village.update(time, dt, v);
+      country.update(time, dt, v, sat);
+      horizon.visible = sat < 0.3;
       ground.material.color.copy(lush).lerp(parched, v.dryness);
       soil.material.color.copy(v.soil);
       cracks.material.opacity = Math.max(0, v.dryness - 0.15) * 1.0;
       sheen.material.opacity = Math.max(0, (v.moisture - 0.62) * 1.6);
-      for (const m of nb) m.material.color.copy(new THREE.Color('#8aa04a').lerp(new THREE.Color('#b8a06a'), v.dryness * 0.8));
       tank.setLevel(v.tankFrac, time);
       const o = Math.max(0, sat - 0.2) / 0.8;
       soilLayer.visible = pinFarm.visible = o > 0.01;
@@ -474,16 +583,24 @@ export function createWorld(canvas, { mobile = false } = {}) {
     return mesh;
   }
 
-  function water(w, d, sx, sz, color = '#3d6d8c', opacity = 0.9) {
+  function water(w, d, sx, sz, color = '#3d6d8c', opacity = 0.9, ripples = [8, 8]) {
     const g = new THREE.PlaneGeometry(w, d, sx, sz);
     g.rotateX(-Math.PI / 2);
     const base = Float32Array.from(g.attributes.position.array);
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.32, metalness: 0.0, envMapIntensity: 0.38, transparent: true, opacity, depthWrite: opacity > 0.85 });
+    // big slow swell in the vertices, fine ripples in a drifting normal map, sky reflections from the environment
+    const normalMap = waterNormalTexture(ripples);
+    const mat = new THREE.MeshStandardMaterial({
+      color, roughness: 0.22, metalness: 0.0, envMapIntensity: 0.6, normalMap, normalScale: new THREE.Vector2(0.3, 0.3),
+      transparent: true, opacity, depthWrite: opacity > 0.85,
+    });
     const mesh = new THREE.Mesh(g, mat);
+    mesh.receiveShadow = true;
     let last = -1;
     return {
       mesh,
       wave(time, amp) {
+        normalMap.offset.set(time * 0.012, time * 0.007);
+        mat.normalScale.setScalar(0.22 + amp * 0.5);       // choppier in a storm
         if (time - last < 1 / 30) return;     // waves at 30 fps are plenty
         last = time;
         const p = g.attributes.position;
@@ -517,78 +634,6 @@ export function createWorld(canvas, { mobile = false } = {}) {
       meshes.push(m);
     }
     return { group, setHeight: (h) => { for (const m of meshes) m.scale.y = Math.max(0.05, h); } };
-  }
-
-  function neighbours(group, rects, color) {
-    const tex = rowsTexture();
-    const out = [];
-    for (const [x, z, w, d] of rects) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color, map: tex }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(x, 0.0, z);
-      m.receiveShadow = true;
-      group.add(m);
-      out.push(m);
-    }
-    return out;
-  }
-
-  function makeHut(x, z) {
-    const g = new THREE.Group();
-    const wallM = new THREE.MeshLambertMaterial({ color: '#c49a6a', map: plasterTexture([2, 1]) });
-    const thatchM = new THREE.MeshLambertMaterial({ color: '#d8b46a', map: thatchTexture([3, 1.5]), side: THREE.DoubleSide });
-    const woodM = new THREE.MeshLambertMaterial({ color: '#6b4a2e' });
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 6.6), new THREE.MeshLambertMaterial({ color: '#9b7a55', map: earthTexture([3, 2]) }));
-    plinth.position.y = 0.25;
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 4.4), wallM);
-    walls.position.y = 1.8;
-    // gabled thatch roof: two sloping slabs and mud gables, ridge along x
-    const pitch = 0.62, half = 3.2, slabW = 8.2;
-    for (const side of [-1, 1]) {
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(slabW, 0.28, half * 1.08), thatchM);
-      slab.position.set(0, 3.1 + Math.sin(pitch) * half / 2, side * Math.cos(pitch) * half / 2);
-      slab.rotation.x = side * pitch;
-      slab.castShadow = true;
-      g.add(slab);
-    }
-    const gable = new THREE.Shape();
-    gable.moveTo(-2.2, 0); gable.lineTo(2.2, 0); gable.lineTo(0, 1.75); gable.closePath();
-    for (const side of [-1, 1]) {
-      const gm = new THREE.Mesh(new THREE.ShapeGeometry(gable), wallM);
-      gm.position.set(side * 3.0, 3.1, 0);
-      gm.rotation.y = side * Math.PI / 2;
-      g.add(gm);
-    }
-    // veranda posts, door, window
-    for (const pz of [-2.9, 2.9]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 2.9, 8), woodM);
-      post.position.set(-3.7, 1.95, pz);
-      post.castShadow = true;
-      g.add(post);
-    }
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.9), new THREE.MeshLambertMaterial({ color: '#3d2a1b' }));
-    door.position.set(-3.01, 1.45, 0.6);
-    door.rotation.y = -Math.PI / 2;
-    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshLambertMaterial({ color: '#2b2219' }));
-    win.position.set(-3.01, 2.0, -1.3);
-    win.rotation.y = -Math.PI / 2;
-    walls.castShadow = walls.receiveShadow = plinth.receiveShadow = true;
-    g.add(plinth, walls, door, win);
-    // haystacks (smooth, with a thatch grain)
-    const hayM = new THREE.MeshLambertMaterial({ color: '#e0bf6a', map: thatchTexture([2, 1]) });
-    for (const [hx, hz, sc] of [[6, -3, 1], [7.4, 1.5, 0.8]]) {
-      const pts = [];
-      for (let k = 0; k <= 10; k++) { const v = k / 10; pts.push(new THREE.Vector2(1.5 * Math.sin(Math.acos(v * 0.98)) * (1 - v * 0.15), v * 3.0)); }
-      const hay = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), hayM);
-      hay.position.set(hx, 0, hz);
-      hay.scale.setScalar(sc);
-      hay.castShadow = true;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 6), woodM);
-      pole.position.set(hx, 3.0 * sc + 0.3, hz);
-      g.add(hay, pole);
-    }
-    g.position.set(x, 0, z);
-    return g;
   }
 
   function trees(group, n, ok, dry = false) {
@@ -1026,17 +1071,6 @@ function radialTexture() {
   });
 }
 
-function rowsTexture() {
-  return canvasTexture(128, 128, (x, w, h) => {
-    x.fillStyle = '#ffffff';
-    x.fillRect(0, 0, w, h);
-    for (let y = 0; y < h; y += 6) {
-      x.fillStyle = `rgba(40,60,20,${0.25 + rand() * 0.15})`;
-      x.fillRect(0, y, w, 2);
-    }
-  }, true);
-}
-
 function crackTexture() {
   return canvasTexture(512, 512, (x, w, h) => {
     x.clearRect(0, 0, w, h);
@@ -1056,6 +1090,37 @@ function crackTexture() {
       x.stroke();
     }
   });
+}
+
+function foamTexture() {
+  return canvasTexture(256, 64, (x, w, h) => {
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) {
+      const cx = rand() * w, cy = h * (0.25 + rand() * 0.5), r = 2 + rand() * 7;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(255,255,255,${0.5 + rand() * 0.5})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g;
+      for (const dx of [0, -w, w]) { x.save(); x.translate(dx, 0); x.fillRect(cx - r, cy - r, r * 2, r * 2); x.restore(); }
+    }
+  }, true);
+}
+
+/** Streaks running down a sheet of pouring water (alpha map, scrolled over time). */
+function spillTexture() {
+  const t = canvasTexture(256, 128, (x, w, h) => {
+    x.fillStyle = 'rgb(70,70,70)';
+    x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 140; i++) {
+      const sx = rand() * w, len = 20 + rand() * 70, sy = rand() * h;
+      x.strokeStyle = `rgba(255,255,255,${0.35 + rand() * 0.55})`;
+      x.lineWidth = 1 + rand() * 2.5;
+      for (const dy of [0, -h, h]) { x.beginPath(); x.moveTo(sx, sy + dy); x.lineTo(sx + (rand() - 0.5) * 3, sy + dy + len); x.stroke(); }
+    }
+  }, true);
+  t.repeat.set(10, 1);
+  return t;
 }
 
 // ---------------------------------------------------------------- small helpers
@@ -1080,6 +1145,59 @@ function flatMask(x, z, plots) {
     m = Math.max(m, 1 - smooth(0, 5, Math.hypot(dx, dz)));
   }
   return m;
+}
+
+/** The rendered height of a terrain mesh at (x, z): the same triangles the GPU draws, so nothing floats or sinks. */
+function meshHeight(mesh) {
+  const { width, height, widthSegments: sx, heightSegments: sz } = mesh.geometry.parameters;
+  const pos = mesh.geometry.attributes.position.array, gx = sx + 1, cw = width / sx, ch = height / sz;
+  const h = (ix, iz) => pos[(iz * gx + ix) * 3 + 1];
+  return (x, z) => {
+    const fx = (x + width / 2) / cw, fz = (z + height / 2) / ch;
+    const ix = Math.min(sx - 1, Math.max(0, Math.floor(fx))), iz = Math.min(sz - 1, Math.max(0, Math.floor(fz)));
+    const u = fx - ix, v = fz - iz;
+    const a = h(ix, iz), b = h(ix, iz + 1), c = h(ix + 1, iz + 1), d = h(ix + 1, iz);
+    return u + v <= 1 ? a + (d - a) * u + (b - a) * v : c + (b - c) * (1 - u) + (d - c) * (1 - v);
+  };
+}
+
+/** Edges where grass grows: round the field's bund, at the foot of the homestead mound, round the pond. */
+function farmEdges(flood) {
+  const rect = (cx, cz, hw, hd) => ({
+    length: 4 * (hw + hd),
+    at(u) {
+      let t = u * 2 * (hw * 2 + hd * 2);
+      const j = (rand() - 0.5) * 1.2;
+      if (t < hw * 2) return [cx - hw + t, cz - hd + j];
+      t -= hw * 2;
+      if (t < hd * 2) return [cx + hw + j, cz - hd + t];
+      t -= hd * 2;
+      if (t < hw * 2) return [cx + hw - t, cz + hd + j];
+      t -= hw * 2;
+      return [cx - hw + j, cz + hd - t];
+    },
+  });
+  const ring = (cx, cz, r) => ({ length: 2 * Math.PI * r, at(u) { const a = u * Math.PI * 2, rr = r + (rand() - 0.5) * 1.2; return [cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]; } });
+  const edges = [rect(0, 0, FW / 2 + 1.7, FD / 2 + 1.7), rect(HOME.x, HOME.z, HOME.w / 2 + 4.4, HOME.d / 2 + 4.4)];
+  if (flood) edges.push(ring(POND.x, POND.z, POND.r + 1.8));
+  return edges;
+}
+
+/** Where animals may stand: anywhere on the plots, but not in the farm's field, on its homestead or under the poles. */
+function openLand(x, z, r) {
+  if (Math.abs(x) < FW / 2 + 4 + r && Math.abs(z) < FD / 2 + 4 + r) return false;
+  if (x > 20 - r && x < 64 + r && z > -16 - r && z < 40 + r) return false;
+  return Math.abs(x + 34) > 2 + r;
+}
+
+/** Room for a neighbouring homestead: off the field, the farm's homestead, the plots, the power line and the camera spots. */
+function clearOfFarm(x, z, r, plots) {
+  const m = r + 8;
+  if (Math.abs(x) < FW / 2 + 12 + m && Math.abs(z) < FD / 2 + 12 + m) return false;
+  if (x > 18 - m && x < 66 + m && z > -18 - m && z < 42 + m) return false;
+  if (Math.abs(x + 34) < 6 + m && z > -16 - m && z < 76 + m) return false;
+  if (Math.hypot(x - 44, z - 52) < 40 + r || Math.hypot(x - 60, z - 70) < 36 + r) return false;
+  return !plots.some(([px, pz, w, d]) => Math.abs(x - px) < w / 2 + m && Math.abs(z - pz) < d / 2 + m);
 }
 
 function nearPlot(x, z, plots) {

@@ -14,8 +14,13 @@ const memo = new Map();
 let lang = 'en';
 const listeners = new Set();
 
-export async function loadLanguages() {
-  try { lang = localStorage.getItem(`${BRAND.storageKey}-lang`) === 'bn' ? 'bn' : 'en'; } catch { /* storage unavailable */ }
+/** @param {{fallback?:'en'|'bn'}} [o] language when the player has never chosen one (the game: en, the Lab: bn) */
+export async function loadLanguages({ fallback = 'en' } = {}) {
+  lang = fallback === 'bn' ? 'bn' : 'en';
+  try {
+    const saved = localStorage.getItem(`${BRAND.storageKey}-lang`);
+    if (saved === 'bn' || saved === 'en') lang = saved;
+  } catch { /* storage unavailable */ }
   await Promise.all(SOURCES.map(async (url) => {
     try {
       const res = await fetch(url);
@@ -53,6 +58,13 @@ export function setLanguage(code) {
 }
 
 export const onLanguage = (fn) => listeners.add(fn);
+
+/** Run fn with t() and f() in another language, then put everything back. No storage, no listeners, no re-render. */
+export function withLanguage(code, fn) {
+  const prev = lang, saved = [...memo];
+  lang = code === 'bn' ? 'bn' : 'en'; memo.clear();
+  try { return fn(); } finally { lang = prev; memo.clear(); for (const [k, v] of saved) memo.set(k, v); }
+}
 
 /** Digits to Bengali digits when Bengali is on. */
 export function num(s) {
@@ -99,6 +111,9 @@ export function date(iso, withYear = true) {
   const months = lang === 'bn' ? MONTHS_BN : MONTHS_EN;
   return num(`${d} ${months[m - 1]}${withYear ? ` ${y}` : ''}`);
 }
+
+/** Short month name, 0 = January. */
+export const monthName = (i) => (lang === 'bn' ? MONTHS_BN : MONTHS_EN)[((i % 12) + 12) % 12];
 
 /** Fill every element that carries data-i18n (text) or data-i18n-title (tooltip) with the current language. */
 export function translateDom(root = document) {

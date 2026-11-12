@@ -1,0 +1,377 @@
+/* Rotation Lab: paper, pencil and wash, taken from frames of our own film (docs/DESIGN.md "The look").
+   Paper page, warm brown ink, colour only where it means something: water, a crop that came home, a thin year,
+   tired soil, the region tints. The one dark element is the satellite's panel. No blur, no gradients, no glass. */
+:root {
+  --paper: #f5f3e6;          /* title-card paper */
+  --sheet: #ede6d4;          /* inset panels */
+  --ink: #474036;            /* the film's pencil: warm dark brown, never black */
+  --ink-2: rgba(71, 64, 54, .74);
+  --ink-3: rgba(71, 64, 54, .52);
+  --ink-faint: rgba(71, 64, 54, .30);
+  --rule: rgba(71, 64, 54, .22);
+  --night: #15130f;          /* the satellite's panel, the film's opening black */
+  --night-text: #f5f3e6;
+  /* washes, sampled from the film */
+  --water: #85a99d; --water-2: #9aabac;
+  --home: #91a87c;           /* crop came home */
+  --thin: #9d9975;           /* a thin year */
+  --dry: #a78b70;            /* dry or tired soil */
+  --haor: #a9baae; --barind: #987c61; --coast: #9aabac;
+  --r: 3px;
+  --fs-cap: 13px; --fs-sub: 15px; --fs-body: 17px; --fs-callout: 18px;
+  --fs-t3: 22px; --fs-t2: 28px;
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --font: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Brush capitals for Latin headings. Placeholder until Zawad names the film's fonts. */
+  --font-brush: 'Caveat Brush', 'Hind Siliguri', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* A hand-ruled line: one pencil stroke with a slight wobble, stretched to any width. */
+  --ruled: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 6' preserveAspectRatio='none'%3E%3Cpath d='M1 3.4C60 2.6 118 3.9 182 3.1S305 2.4 399 3.5' fill='none' stroke='%23474036' stroke-opacity='.55' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  /* The pencil cross laid over a lost year. */
+  --cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' preserveAspectRatio='none'%3E%3Cpath d='M4 4.5 16 15.5M15.5 4 4.5 16' stroke='%23474036' stroke-width='1.6' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+  /* Bare field: pencil hatching, one stroke direction. */
+  --hatch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-1 9 9 -1M-1 1 1 -1M7 9 9 7' stroke='%23474036' stroke-opacity='.45' stroke-width='1'/%3E%3C/svg%3E");
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--paper);
+}
+body {
+  margin: 0; min-height: 100vh; min-height: 100svh;
+  background: var(--paper); color: var(--ink); font-family: var(--font);
+  font-size: var(--fs-body); line-height: 1.65;
+  overflow-x: hidden;
+}
+button, input { font: inherit; color: inherit; }
+button, a, [role="button"], input[type="range"] { touch-action: manipulation; }
+button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; }
+h1, h2, h3, h4, p, ul, ol, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+p, li, dd, .h1, .h2, .h3 { overflow-wrap: break-word; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: var(--r); }
+.small { font-size: var(--fs-sub); } .tiny { font-size: var(--fs-cap); }
+.muted { color: var(--ink-2); } .faint { color: var(--ink-3); }
+
+/* ---------------------------------------------------------------- lettering
+   Latin headings in brush capitals; Bangla headings stay in a clean bold face (a farmer must read them). */
+.h1, .h2, .h3, .brand b { font-family: var(--font-brush); font-weight: 400; letter-spacing: .01em; }
+:lang(bn) .h1, :lang(bn) .h2, :lang(bn) .h3 { font-family: var(--font); font-weight: 700; letter-spacing: 0; }
+.h1 { font-size: var(--fs-t2); line-height: 1.15; }
+.h2 { font-size: var(--fs-t3); line-height: 1.25; }
+.h3 { display: block; font-size: var(--fs-callout); line-height: 1.3; }
+:lang(en) .h1 { font-size: 32px; } :lang(en) .h2 { font-size: 26px; } :lang(en) .h3 { font-size: 21px; }
+.h4 { font-size: var(--fs-sub); font-weight: 700; margin-bottom: 4px; }
+
+/* ---------------------------------------------------------------- shell */
+.top, .page, .foot {
+  width: 100%; max-width: 720px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
+}
+.top {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px)); padding-bottom: 14px;
+  background: var(--ruled) 50% 100% / calc(100% - 32px) 6px no-repeat;
+}
+.brand { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
+.brand b { font-size: 20px; line-height: 1; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.page { display: flex; flex-direction: column; gap: 24px; padding-top: 20px; padding-bottom: 32px; }
+.page > section { min-width: 0; }
+.lede { color: var(--ink-2); }
+
+/* ---------------------------------------------------------------- pencil boxes
+   A thin ink outline, a second faint line offset down-right, 3 px corners, no shadow. */
+.card, .region, .sat, .status, .yr-detail { position: relative; }
+.card {
+  background: var(--paper); border: 1.25px solid var(--ink); border-radius: var(--r);
+  padding: 16px; min-width: 0;
+}
+.card::before, .region::before {
+  content: ""; position: absolute; inset: 3px -4px -4px 3px; border: 1px solid var(--ink-faint);
+  border-radius: 4px 2px 5px 3px; pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- controls
+   Every control is at least 48 px tall. Pressed = filled with ink, paper text. Hover only where a mouse is. */
+.btn, .seg button, .chip, .region, .disc, .yr { transition: transform 120ms var(--ease-out); }
+.btn:active, .seg button:active, .chip:active, .region:active, .disc:active { transform: scale(.97); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 6px 20px;
+  border-radius: var(--r); border: 1.25px solid var(--ink); background: var(--paper); color: var(--ink);
+  font-size: var(--fs-sub); font-weight: 600; line-height: 1.3; text-align: center; cursor: pointer; text-decoration: none;
+}
+.btn.primary { background: var(--ink); color: var(--paper); }
+.seg { display: inline-flex; border: 1.25px solid var(--ink); border-radius: var(--r); }
+.seg button {
+  min-height: 46px; min-width: 64px; padding: 0 12px; border: 0; background: transparent; border-radius: 1px;
+  font-weight: 600; font-size: var(--fs-sub); cursor: pointer; color: var(--ink);
+}
+.seg button + button { border-left: 1.25px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.q { font-size: var(--fs-callout); font-weight: 600; margin: 16px 0 8px; }
+.q:first-of-type { margin-top: 0; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 48px; padding: 6px 16px; border-radius: var(--r); border: 1px solid var(--ink-2); background: var(--paper);
+  font-size: var(--fs-sub); font-weight: 600; line-height: 1.3; text-align: left; cursor: pointer; max-width: 100%;
+}
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.choices[aria-labelledby="q-fear"] { display: grid; grid-template-columns: 1fr 1fr; }
+@media (min-width: 560px) { .choices[aria-labelledby="q-fear"] { display: flex; } }
+.chip.stop[aria-pressed="true"] { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+
+/* where is your field: each region is a pencil box with its wash on the left, like the film's map */
+.regions { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 560px) { .regions { grid-template-columns: repeat(3, 1fr); } }
+.region {
+  --c: var(--haor);
+  min-height: 64px; padding: 10px 16px 10px 14px; border-radius: var(--r); border: 1.25px solid var(--ink);
+  background: var(--paper); text-align: left; font-weight: 600; font-size: var(--fs-body); line-height: 1.35; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+}
+.region::after { content: ""; order: -1; flex: none; width: 22px; height: 30px; border-radius: 40% 55% 45% 60%; background: var(--c); opacity: .9; }
+.region[data-region="barind"] { --c: var(--barind); } .region[data-region="coast"] { --c: var(--coast); }
+.region[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.disc {
+  width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px;
+  padding: 6px 14px; border-radius: var(--r); border: 1.25px solid var(--ink); background: var(--paper);
+  font-weight: 600; font-size: var(--fs-sub); cursor: pointer; text-align: left;
+}
+.disc::after { content: "+"; font-size: 22px; line-height: 1; flex: none; }
+.disc[aria-expanded="true"]::after { content: "\2212"; }
+.limit-row { padding: 10px 0; background: var(--ruled) top / 100% 6px no-repeat; }
+.limit-row b { display: block; font-size: var(--fs-sub); margin-bottom: 6px; }
+
+/* sliders */
+.slider { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px; padding: 6px 0; }
+.slider label { font-weight: 600; font-size: var(--fs-sub); }
+.slider output { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: var(--fs-sub); text-align: right; }
+.slider input[type="range"] { grid-column: 1 / -1; width: 100%; min-height: 48px; margin: 0; accent-color: var(--ink); background: transparent; }
+
+/* a plain link that opens a panel; section break above it is a hand-ruled line */
+.side { padding-top: 4px; background: var(--ruled) top / 100% 6px no-repeat; }
+.side > .link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-decoration: none; }
+.side > .link::after { content: "+"; flex: none; font-size: 22px; font-weight: 400; line-height: 1; color: var(--ink-2); }
+.side > .link[aria-expanded="true"]::after { content: "\2212"; }
+.side + .side { margin-top: -16px; }
+.link {
+  background: none; border: 0; padding: 0; min-height: 48px; color: var(--ink); text-decoration: underline;
+  text-decoration-thickness: 1px; text-underline-offset: 4px; font-weight: 600; font-size: var(--fs-body); cursor: pointer; text-align: left;
+}
+.side-body { padding: 4px 0 12px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover, .chip:hover, .region:hover, .disc:hover, .seg button:hover { background: var(--sheet); }
+  .btn.primary:hover, .chip[aria-pressed="true"]:hover, .region[aria-pressed="true"]:hover,
+  .seg button[aria-pressed="true"]:hover { background: var(--ink); }
+  .link:hover, a:hover { text-decoration-thickness: 2px; }
+  .side > .link:hover::after { color: var(--ink); }
+  .way:hover .more { text-decoration-thickness: 2px; }
+}
+
+/* ---------------------------------------------------------------- four-step flow */
+.step { display: flex; flex-direction: column; gap: 16px; }
+.step [data-step-title]:focus { outline: none; }
+.step-no { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: var(--fs-cap); font-weight: 600; letter-spacing: .06em; }
+.pips { display: inline-flex; gap: 4px; }
+.pips i { width: 16px; height: 3px; border-radius: 2px; background: var(--ink-faint); }
+.pips i.on { background: var(--ink); }
+.step-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.step-actions .btn { flex: 1 1 auto; }
+@media (min-width: 560px) { .step-actions .btn { flex: 0 1 auto; } }
+
+.status {
+  padding: 14px 16px; border-radius: var(--r); background: var(--sheet); border: 1px dashed var(--ink-3); color: var(--ink-2);
+}
+.status.warn { border-style: solid; border-color: var(--ink); color: var(--ink); }
+
+/* the satellite's voice: the only dark thing on the page (typed out like the film's opening) */
+.sat {
+  background: var(--night); color: var(--night-text); border-radius: 2px; padding: 18px 16px;
+  font-family: var(--font-mono); font-size: 14px; line-height: 1.75; text-transform: uppercase; letter-spacing: .05em;
+  overflow-wrap: anywhere;
+}
+.sat p:lang(bn), .sat:lang(bn) p { letter-spacing: 0; }
+/* there is no Bangla monospace: Bangla lines keep the typewriter rhythm but use the clean Bangla face */
+:root:lang(bn) .sat p:not(:first-child) { font-family: var(--font); font-size: 16px; line-height: 1.6; }
+:root:lang(bn) .sat p:nth-child(3) { font-size: 22px; }
+.sat p:first-child { color: rgba(245, 243, 230, .6); font-size: 12px; }
+.sat p:nth-child(3) { font-size: 20px; line-height: 1.4; font-weight: 700; margin: 6px 0 2px; letter-spacing: .02em; }
+.sat-last { margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(245, 243, 230, .28); }
+/* typed in once, line by line, like the film's opening card (a rare moment, so it may take a second) */
+.sat.typed p { animation: sat-line 320ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 260ms + 120ms); }
+.sat.typed .sat-last { animation-duration: 700ms; }
+@keyframes sat-line { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (min-width: 560px) { .sat { padding: 26px 24px; font-size: 15px; } .sat p:nth-child(3) { font-size: 24px; } }
+.say { display: flex; flex-direction: column; gap: 6px; }
+.say p { font-size: var(--fs-callout); line-height: 1.6; }
+
+/* ---------------------------------------------------------------- the ways of planting */
+.cards { display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+.rot { display: flex; flex-direction: column; gap: 12px; }
+.rot.existing { background: var(--sheet); }
+.rot.conflict { color: var(--ink-2); }
+.rot.conflict .strip { opacity: .6; }
+.way { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; width: 100%; cursor: pointer; }
+.way:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; border-radius: var(--r); }
+.way > span { display: block; }
+.rot-head, .way > .rot-head { display: flex; gap: 12px; align-items: flex-start; }
+.rot-head > span:last-child { min-width: 0; }
+.rank {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.25px solid var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.badge {
+  display: inline-block; margin-top: 6px; padding: 1px 8px; border: 1px solid var(--ink); border-radius: 2px;
+  font-size: var(--fs-cap); font-weight: 600; line-height: 1.6; align-self: flex-start;
+}
+.came { font-weight: 600; }
+.why { font-size: var(--fs-sub); color: var(--ink-2); }
+.more { font-size: var(--fs-sub); font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+
+/* year squares: wash per year, a lost year is the flood wash with a pencil cross */
+.strip { display: flex; gap: 2px; align-items: stretch; }
+.yr { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.yr > span:first-child {
+  display: block; width: 100%; height: 26px; border-radius: 2px; background-color: var(--home);
+  background-position: center; background-repeat: no-repeat; background-size: 100% 100%;
+}
+.yr-fair > span:first-child { background-color: var(--thin); }
+.yr-poor > span:first-child { background-color: var(--dry); }
+.yr-lost > span:first-child { background-color: var(--water); background-image: var(--cross); }
+.strip-ends { display: flex; justify-content: space-between; color: var(--ink-3); font-size: var(--fs-cap); font-variant-numeric: tabular-nums; margin-top: -4px; }
+
+/* step 4: the squares are tapped, so they get 28 px wide, 48 px tall, and the strip scrolls sideways */
+.strip[role="group"] {
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: thin;
+  gap: 3px; padding: 2px 2px 6px; margin: 0 -2px;
+}
+.strip[role="group"] .yr { flex: 0 0 28px; min-height: 52px; cursor: pointer; scroll-snap-align: start; }
+.strip[role="group"] .yr > span:first-child { height: 28px; }
+.yr-n { font-size: 11px; line-height: 1; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.yr:active > span:first-child { transform: scale(.92); }
+.yr > span:first-child { transition: transform 120ms var(--ease-out); }
+.yr[aria-pressed="true"] > span:first-child { outline: 2px solid var(--ink); outline-offset: 2px; }
+.yr[aria-pressed="true"] .yr-n { color: var(--ink); font-weight: 700; }
+.yr:focus-visible { outline-offset: 0; }
+.strip[role="group"] + .strip-ends { display: none; }
+
+/* N6, the replay moment: squares fill in left to right, 40 ms apart, like years passing; a lost year lands with
+   a short flood wash. Only transform and opacity. The only motion on the page besides tap feedback. */
+.strip.replay .yr > span:first-child {
+  position: relative;
+  animation: yr-in 280ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms);
+}
+.strip.replay .yr-lost > span:first-child::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 3px; background: var(--water-2); opacity: 0;
+  animation: yr-wash 520ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms + 200ms);
+}
+@keyframes yr-in { from { opacity: 0; transform: scaleY(.35); } to { opacity: 1; transform: none; } }
+@keyframes yr-wash { 0% { opacity: 0; transform: scale(.8); } 35% { opacity: .75; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.25); } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: var(--fs-cap); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 2px; background-size: 100% 100%; }
+.legend i.yr-good { background-color: var(--home); } .legend i.yr-fair { background-color: var(--thin); }
+.legend i.yr-poor { background-color: var(--dry); }
+.legend i.yr-lost { background-color: var(--water); background-image: var(--cross); }
+
+.yr-detail { padding: 12px 14px; border-radius: var(--r); background: var(--sheet); border-left: 3px solid var(--ink); font-size: var(--fs-sub); }
+.yr-detail li { padding: 2px 0; }
+
+.facts { display: flex; flex-direction: column; }
+.facts li { padding: 7px 0; background: var(--ruled) bottom / 100% 6px no-repeat; }
+.facts li:last-child { background: none; }
+.conflict-note { padding: 10px 14px; border-radius: var(--r); background: color-mix(in srgb, var(--dry) 35%, var(--paper)); border: 1px solid var(--dry); font-size: var(--fs-sub); font-weight: 600; }
+.notes { color: var(--ink-3); font-size: var(--fs-cap); display: flex; flex-direction: column; gap: 4px; }
+
+/* show me why */
+.ev-body { display: flex; flex-direction: column; gap: 16px; padding-top: 14px; background: var(--ruled) top / 100% 6px no-repeat; }
+.ev-body li { font-size: var(--fs-sub); padding: 2px 0 2px 16px; position: relative; color: var(--ink-2); }
+.ev-body li::before { content: ""; position: absolute; left: 2px; top: .85em; width: 7px; height: 1.25px; background: var(--ink-3); }
+.ev-body .src li { overflow-wrap: anywhere; }
+.src-for { color: var(--ink); display: block; }
+
+/* the year on one line (N3): crop bars on a hatched track (hatched = bare field), danger band underneath */
+.cal { display: flex; flex-direction: column; gap: 8px; }
+.cal-months { position: relative; height: 16px; font-size: 12px; color: var(--ink-3); line-height: 16px; }
+.cal-months span { position: absolute; top: 0; white-space: nowrap; }
+.cal-track, .cal-danger { position: relative; width: 100%; }
+.cal-track {
+  height: 40px; border: 1.25px solid var(--ink); border-radius: 2px; overflow: hidden;
+  background: var(--hatch) var(--paper);
+}
+.cal-track i { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--ink-faint); }
+.cal-bar {
+  position: absolute; top: 4px; bottom: 4px; background: var(--home); border: 1px solid var(--ink); border-radius: 2px;
+  font-size: 12px; font-weight: 600; line-height: 30px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-danger { height: 12px; margin-top: -2px; }
+.cal-band { position: absolute; top: 0; bottom: 0; border: 1px solid var(--ink); border-top: 0; border-radius: 0 0 2px 2px; min-width: 8px; }
+.cal-band.flood, .cal-key.flood { background: var(--water); }
+.cal-band.heat, .cal-key.heat { background: var(--dry); }
+.cal-key { border: 1px solid var(--ink-2); }
+.cal-key.crop { background: var(--home); }
+.cal-key.bare { background: var(--hatch) var(--paper); }
+.cal-say { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sub); }
+.cal-dates { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* is this what you remember? (N4) and one-tap words */
+.mem { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 8px; }
+.mem-row {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 10px;
+  padding: 6px 6px 6px 10px; border: 1px solid var(--rule); border-radius: var(--r);
+}
+.mem-row:has([aria-pressed="true"]) { border-color: var(--ink-2); background: var(--sheet); }
+.mem-year { font-variant-numeric: tabular-nums; font-size: var(--fs-sub); }
+.mem-row .seg { justify-self: end; }
+.mem-row .seg button { min-width: 48px; min-height: 44px; padding: 0 8px; }
+.mem-sat { grid-column: 1 / -1; min-width: 0; line-height: 1.4; }
+.say-agree { font-size: var(--fs-callout); font-weight: 700; }
+.term { display: flex; flex-direction: column; }
+.terms { display: flex; flex-wrap: wrap; column-gap: 24px; }
+.terms .term:has([aria-expanded="true"]) { flex-basis: 100%; }
+.term .link { font-size: var(--fs-sub); font-weight: 400; }
+.term-body { padding: 0 0 8px; color: var(--ink-2); font-size: var(--fs-sub); }
+
+/* N7: your own field, under the three places */
+.mine { margin-top: 22px; padding-top: 16px; background: var(--ruled) 0 0 / 100% 6px no-repeat; }
+.mine .btn[disabled] { opacity: .55; cursor: progress; }
+
+/* ---------------------------------------------------------------- footer */
+.foot {
+  padding-top: 18px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  color: var(--ink-2); font-size: var(--fs-sub); display: flex; flex-direction: column; gap: 10px;
+  background: var(--ruled) 50% 0 / calc(100% - 32px) 6px no-repeat;
+}
+.foot p:first-child { color: var(--ink); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* ---------------------------------------------------------------- small phones (N5) */
+.sms { margin: 14px 0 8px; padding: 10px 12px; background: var(--sheet); border: 1.25px solid var(--rule); border-radius: var(--r); font-size: var(--fs-sub); overflow-wrap: anywhere; }
+#print-sheet { display: none; }
+
+/* ---------------------------------------------------------------- print: one page for the extension officer */
+@media print {
+  @page { margin: 14mm; }
+  html, body { background: #fff; }
+  .top, .page, .foot, noscript { display: none !important; }
+  #print-sheet { display: block; color: #000; font: 10.5pt/1.4 var(--font); }
+  #print-sheet h1 { font-size: 16pt; margin: 0 0 4pt; }
+  #print-sheet h2 { font-size: 12pt; margin: 10pt 0 3pt; }
+  #print-sheet p { margin: 0 0 5pt; }
+  #print-sheet table { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  #print-sheet th, #print-sheet td { border: 1px solid #000; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  #print-sheet tr { break-inside: avoid; }
+  #print-sheet .print-small { font-size: 9pt; }
+}

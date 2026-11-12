@@ -59,6 +59,13 @@ export function setLanguage(code) {
 
 export const onLanguage = (fn) => listeners.add(fn);
 
+/** Run fn with t() and f() in another language, then put everything back. No storage, no listeners, no re-render. */
+export function withLanguage(code, fn) {
+  const prev = lang, saved = [...memo];
+  lang = code === 'bn' ? 'bn' : 'en'; memo.clear();
+  try { return fn(); } finally { lang = prev; memo.clear(); for (const [k, v] of saved) memo.set(k, v); }
+}
+
 /** Digits to Bengali digits when Bengali is on. */
 export function num(s) {
   s = String(s);

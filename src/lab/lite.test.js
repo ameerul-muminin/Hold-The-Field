@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { REGIONS } from './view.js';
 import { SMS_BN_MAX, SMS_EN_MAX, LITE_MAX_BYTES, smsHref } from './lite.js';
-import { buildAll } from '../../scripts/build-lab.mjs';
+import { buildAll, loadBangla } from '../../scripts/build-lab.mjs';
+import { withLanguage } from '../i18n.js';
+import { smsTexts } from './lite.js';
+import { itemsFromPre } from './pre.js';
 
 const root = new URL('../../', import.meta.url);
 const built = await buildAll();
@@ -46,4 +49,15 @@ test('the lite pages have no English left over (every sentence has a Bengali ent
 test('smsHref makes a sms: link that carries the whole text', () => {
   const text = 'হাওর: ২৫ বছর, 5 & 6';
   assert.equal(decodeURIComponent(smsHref(text).slice('sms:?body='.length)), text);
+});
+
+test('the Bangla SMS is Bangla even while the page is in English', async () => {
+  await loadBangla();
+  const read = (rel) => JSON.parse(fs.readFileSync(new URL(rel, root), 'utf8'));
+  const entries = (d) => Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith('_')));
+  const pre = read('data/lab/haor.json'), crops = entries(read('data/crops.json')), rot = entries(read('data/rotations.json'));
+  const items = itemsFromPre(pre, rot.haor, crops);
+  const onEnglishPage = withLanguage('en', () => withLanguage('bn', () => smsTexts('haor', items)));
+  assert.equal(onEnglishPage.bn, pre.sms.bn);
+  assert.match(onEnglishPage.bn, /[\u0980-\u09FF]/);
 });

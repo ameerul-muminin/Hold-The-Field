@@ -5,7 +5,7 @@
 //   4 way     One way in detail
 // The step lives in the URL hash (#haor/ways, #haor/way/short) so the phone's back button walks back.
 // The numbers come from src/rotation/ through view.js; this file only draws and wires.
-import { loadLanguages, setLanguage, onLanguage, language, t, f, num, date, monthName } from '../i18n.js';
+import { loadLanguages, setLanguage, onLanguage, language, t, f, num, date, monthName, withLanguage } from '../i18n.js';
 import { BRAND } from '../brand.js';
 import {
   REGIONS, REGION_NAMES, PRIORITIES, GAP_WORDS, PARAM_WORDS, WHY_RANK, WHY_LOW, SOIL_CHOICES, CROP_SHORT,
@@ -360,7 +360,8 @@ function memoryPanel(ex) {
 function currentSms() {
   if (results.pre?.sms) return results.pre.sms;
   if (state.rainPct || state.tempC || !existing()) return null;   // a what-if guess is not sent as a fact
-  try { const x = smsTexts(state.region, results.items); checkSms(state.region, x); return x; } catch { return null; }
+  // the Bangla text is Bangla whatever language the page shows
+  try { const x = withLanguage('bn', () => smsTexts(state.region, results.items)); checkSms(state.region, x); return x; } catch { return null; }
 }
 function sharePanel() {
   const sms = currentSms();

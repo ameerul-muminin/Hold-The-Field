@@ -14,7 +14,7 @@ import {
   failedYearList,
 } from './view.js';
 import { itemsFromPre, needsClimate } from './pre.js';
-import { smsHref, liteHref } from './lite.js';
+import { smsHref, liteHref, smsTexts, checkSms } from './lite.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -105,6 +105,8 @@ window.addEventListener('popstate', () => route(false));
 async function route(moveFocus) {
   const r = parseHash();
   if (r.region && r.region !== state.region) await loadRegion(r.region);
+  const now = parseHash();   // Back may have moved on while the region loaded: show only where the URL still points
+  if (now.region !== r.region || now.step !== r.step || now.way !== r.way) return;
   show(r.step, r.way, moveFocus);
 }
 
@@ -165,6 +167,8 @@ function renderWhere() {
 }
 
 // ---------------------------------------------------------------- step 2: what the satellite saw
+const whatIfNote = () => (state.rainPct || state.tempC
+  ? `<p class="status warn">${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</p>` : '');
 function renderSaw() {
   const ex = existing();
   const head = `${stepMark(2)}
@@ -184,6 +188,7 @@ function renderSaw() {
     ...fd.sat,
   ];
   return `${head}
+    ${whatIfNote()}
     <p class="small muted">${F('What you grow now: {}', t(ex.rotation.label))}</p>
     <div class="sat" role="group" aria-label="${esc(t('What the satellite saw'))}">
       ${sat.map((l) => `<p>${lineText(l)}</p>`).join('')}
@@ -202,8 +207,18 @@ function renderSaw() {
 function whyLine(row, idx) {
   const item = itemById(row.id);
   if (item.rotation.conflict) return T('Last, because you said it will not work for you.');
-  if (idx === 0) return T(row.top === 'safety' && isFlood() ? WHY_RANK.safetyFlood : WHY_RANK[row.top]);
+  if (idx === 0) {
+    if (!bestOn(row.top, item)) return T(WHY_RANK.overall);
+    return T(row.top === 'safety' && isFlood() ? WHY_RANK.safetyFlood : WHY_RANK[row.top]);
+  }
   return T(WHY_LOW[weakest(row, state.prio)]);
+}
+// row.top is the biggest part of a combined score. Only name it when this way really is best on that measure.
+function bestOn(key, item) {
+  const m = { safety: (s) => -s.failedYears, yield: (s) => s.harvestMedian ?? s.median ?? 0, water: (s) => -(s.waterMedianMm ?? 0), soil: (s) => s.soilScore ?? 0 }[key];
+  if (!m) return false;
+  const mine = m(item.result.summary);
+  return results.items.every((o) => m(o.result.summary) <= mine + 1e-9);
 }
 // For a card below first place, what holds it back: the priority where it gives up the most score.
 function weakest(row, prio) {
@@ -342,12 +357,17 @@ function memoryPanel(ex) {
 }
 
 // ---- small phones (N5): the message for a button phone, the light page, and the one-page print
+function currentSms() {
+  if (results.pre?.sms) return results.pre.sms;
+  if (state.rainPct || state.tempC || !existing()) return null;   // a what-if guess is not sent as a fact
+  try { const x = smsTexts(state.region, results.items); checkSms(state.region, x); return x; } catch { return null; }
+}
 function sharePanel() {
-  const sms = results.pre?.sms;
+  const sms = currentSms();
   const link = (text, lang, label) => `<p class="sms" lang="${lang}">${esc(text)}</p>
     <a class="btn" href="${esc(smsHref(text))}">${T('Send by SMS')} (${T(label)})</a>`;
   return `<p class="small muted">${T('The phone in your hand may not open a website. A short message still reaches you. Your extension officer can send it or read it out.')}</p>
-    ${sms ? `${link(sms.bn, 'bn', 'Bangla letters')}${link(sms.en, 'en', 'English letters')}` : ''}
+    ${sms ? `${link(sms.bn, 'bn', 'Bangla letters')}${link(sms.en, 'en', 'English letters')}` : (state.rainPct || state.tempC ? `<p class="small muted">${T('Texts are only made for the satellite record, not for a what-if guess.')}</p>` : '')}
     <div class="step-actions">
       <button type="button" class="btn" data-act="print" data-fid="print">${T('Print one page for the extension officer')}</button>
       <a class="btn" href="${esc(liteHref(state.region))}">${T('Light version for small phones')}</a>
@@ -367,7 +387,7 @@ function renderPrint() {
   });
   const facts = currentFacts();
   const rows = rankItems(results.items, state.prio).map((r) => itemById(r.id));
-  const sms = results.pre?.sms;
+  const sms = currentSms();
   el.innerHTML = `<h1>${esc(BRAND.name)} · ${T('Your field, year by year')}</h1>
     <p><b>${T(REGION_NAMES[state.region])}</b> · ${T('For the extension officer')}</p>
     ${state.rainPct || state.tempC ? `<p><b>${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</b></p>` : ''}
@@ -376,7 +396,7 @@ function renderPrint() {
       <thead><tr><th>${T('Way of planting')}</th><th>${T('Years the crop came home')}</th><th>${T('Empty days a year')}</th><th>${T('Pumped water, mm a year')}</th><th>${T('Hardest years')}</th></tr></thead>
       <tbody>${rows.map((it) => {
     const s = it.result.summary, bad = failedYearList(it.result);
-    return `<tr><td>${T(it.rotation.label)}${it.rotation.existing ? `<br><i>${T('What you grow now')}</i>` : ''}</td>
+    return `<tr><td>${T(it.rotation.label)}${it.rotation.existing ? `<br><i>${T('What you grow now')}</i>` : ''}${(it.rotation.notModelled || []).map((n) => `<br><i>${noteText(n)}</i>`).join('')}</td>
         <td>${esc(num(`${s.n - s.failedYears} / ${s.n}`))}</td><td>${esc(num(s.bareDays))}</td><td>${esc(num(Math.round(s.waterMedianMm)))}</td>
         <td>${bad.length ? esc(num(bad.join(', '))) : '-'}</td></tr>`;
   }).join('')}</tbody>
@@ -398,7 +418,7 @@ function renderWays() {
     <div class="choices" role="group" aria-labelledby="q-fear">${PRIORITIES.map((p) => `
       <button type="button" class="chip" data-act="fear" data-v="${p.key}" data-fid="fear-${p.key}" aria-pressed="${state.fear === p.key}">${T(p.label)}</button>`).join('')}
     </div>
-    ${state.rainPct || state.tempC ? `<p class="status warn">${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</p>` : ''}
+    ${whatIfNote()}
     <ol class="cards">${results.rows.map((row, i) => wayCard(row, i)).join('')}</ol>
     ${legendHTML()}
     ${sideDoor('field', 'Tell us about your field', fieldPanel())}
@@ -514,6 +534,7 @@ function renderWay() {
     ${rotation.existing ? `<span class="badge">${T('What you grow now')}</span>` : ''}
     <p class="small muted">${F('What you grow: {}', [...new Set(rotation.slots.map((x) => x.crop))].map(cropName).join(`${t(', then')} `))}</p>
     ${rotation.share ? `<p class="small muted">${F('How common here: {}', t(rotation.share))}</p>` : ''}
+    ${whatIfNote()}
     <p class="came">${cameHome(item)}</p>
     <p class="small muted">${T('Tap a year to see what happened.')}</p>
     ${stripHTML(item, true)}

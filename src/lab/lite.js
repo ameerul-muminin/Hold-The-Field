@@ -108,7 +108,7 @@ export function liteHTML({ region, items, sms, facts, sample = false }) {
   const ways = rows.map((row) => {
     const it = byId.get(row.id), s = it.result.summary, water = Math.round(s.waterMedianMm);
     const bad = failedYearList(it.result);
-    return `<li><h3>${T(it.rotation.label)}</h3>${it.rotation.existing ? `<p class="m">${T('What you grow now')}</p>` : ''}
+    return `<li><h3>${T(it.rotation.label)}</h3>${it.rotation.existing ? `<p class="m">${T('What you grow now')}</p>` : ''}${(it.rotation.notModelled || []).map((n) => `<p class="m">${T(plain({ text: n, vals: [] }).text)}</p>`).join('')}
 <p>${L('{} of {} years, the {} came home.', s.n - s.failedYears, s.n, t(cropWord(it.rotation)))}${bad.length ? ` ${L('Hardest years: {}.', bad.join(', '))}` : ''}</p>
 <p>${L('Your field lies empty {} days a year.', s.bareDays)} ${water >= 1 ? L('Water you must pump: about {} mm a year.', water) : T('No pumped water needed.')}</p></li>`;
   }).join('\n');

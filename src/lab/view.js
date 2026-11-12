@@ -37,6 +37,7 @@ export const PARAM_WORDS = {
 export const WHY_RANK = {
   safety: 'Safest in the bad years.',
   safetyFlood: 'Safest in the flood years.',
+  overall: 'Best overall for what you asked.',
   yield: 'Brings home the most harvest.',
   water: 'Needs the least pumped water.',
   soil: 'Gives the most back to the soil.',

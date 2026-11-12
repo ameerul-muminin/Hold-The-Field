@@ -1,5 +1,5 @@
 {
- "_about": "Crop parameters for the Rotation Lab. Every value has a source or is null (shown on screen as an information gap). Collected with AI help on 11 Nov 2026 and NOT yet reviewed by the team's research lead. Days are days in the field (rice: total duration minus seedbed).",
+ "_about": "Crop parameters for the Rotation Lab. Every value has a source or is null (shown on screen as an information gap). Collected with AI help on 11 Nov 2026 and NOT yet reviewed by the team's research lead. On 12 Nov 2026 an AI (not a field expert) opened every source URL and compared it with the value; see docs/AI_USAGE.md. Days are days in the field (rice: total duration minus seedbed).",
  "boro_long": {
   "name": "Long-duration boro rice",
   "variety": "BRRI dhan29",
@@ -76,7 +76,7 @@
   "name": "Transplanted Aman rice",
   "variety": "BRRI dhan71",
   "family": "cereal",
-  "days": 118,
+  "days": 98,
   "kc": [
    1.05,
    1.2,
@@ -99,7 +99,7 @@
   "market": null,
   "price": null,
   "source": {
-   "days": "https://csa.ru.ac.bd/bjals/Volume3(2022)/v0302202210.pdf (113-122 days after transplanting)",
+   "days": "https://csa.ru.ac.bd/bjals/Volume3(2022)/v0302202210.pdf (BRRI dhan71 days to maturity 113-122, mean 117.89, with 20-day-old seedlings; the paper does not say whether the count starts at sowing or transplanting; read here as from sowing, so 118 minus 20 seedbed days)",
    "kc": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 12, Rice: 1.05 / 1.20 / 0.90-0.60; end value is the midpoint)",
    "stageShare": "https://www.fao.org/4/x0490e/x0490e0b.htm (Table 11, Rice, Tropics: 30/30/60/30 of 150 days)",
    "heatC": "https://arccjournals.com/journal/agricultural-reviews/R-2353 (over 35 C at flowering raises spikelet sterility)",

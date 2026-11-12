@@ -27,6 +27,7 @@ export const prioFor = (fear) => Object.fromEntries(PRIORITIES.map((p) => [p.key
 export const GAP_WORDS = {
   ky: 'how it takes a dry spell', heatC: 'how much heat it takes', price: 'the price', market: 'who buys it',
   forage: 'its value as cattle feed', cover: 'how well it holds the soil', organicMatter: 'what it gives back to the soil',
+  irrigated: 'whether it gets pumped water', stageShare: 'how long each growth stage lasts', residue: 'what it leaves on the field',
 };
 /** Plain words for the sourced fields of crops.json. */
 export const PARAM_WORDS = {
@@ -79,6 +80,9 @@ export const PLAIN = {
   'No market prices in the model': 'We do not know your market price. Ask before you plant.',
   'No salinity data': 'We have no salt readings for your field.',
   'No pest or disease model': 'We do not count pests or disease.',
+  'No storm or waterlogging model': 'We do not count storms or standing water.',
+  'Water lost by seepage and land preparation is not counted': 'We do not count water that seeps away.',
+  'How much water the soil holds is our guess, not a measurement': 'How much water each soil holds is our guess, not a soil test.',
   'One NASA POWER grid cell is about {} km wide; your field can differ': 'The weather is for a square about {} km wide. Your field can differ.',
   'Rain-shortage losses use a default response for some crops': 'For some crops, we used a standard guess for dry spells.',
   'Seed availability': 'Can you get the seed?',
@@ -143,10 +147,12 @@ export function finding(result, { word = 'crop', saferName = null, saferFailed =
     say.push(L('In {} years, the {} was thin {} times: {}.', n, word, s.failedYears, thin.join(', ')));
   } else {
     kind = 'fine';
-    sat.push(L('Crop came home: {} of {} years', n, n), L('Field empty: {} days a year', s.bareDays));
-    say.push(L('In {} years, your {} came home every year.', n, word));
+    sat.push(L('Rain and heat took the crop: {} of {} years', 0, n), L('Field empty: {} days a year', s.bareDays));
+    say.push(L('In {} years, rain and heat did not take your {}.', n, word));
+    // The model has no storm, salt or waterlogging rule, so a clean record is only clean for rain and heat.
+    say.push(L('We do not count storms, salt or standing water.'));
     say.push(L('But your field lies empty {} days a year.', s.bareDays));
-    if (s.waterMedianMm >= 1) say.push(L('You pump about {} mm of water a year for it.', Math.round(s.waterMedianMm)));
+    if (s.waterMedianMm >= 1) say.push(L('It needs about {} mm of water beyond rain each year.', Math.round(s.waterMedianMm)), L('We assume the pump always has water.'));
   }
   const safer = !!saferName;
   if (safer) {
@@ -237,7 +243,7 @@ export function evidenceFor(item, baselineItem, crops, climate, topKey) {
   const c = expand(climate);
   const top = PRIORITIES.find((p) => p.key === topKey)?.short ?? null;
   return evidenceCard(item.rotation, item.result, crops, item.rotation.existing ? null : baselineItem?.result ?? null, {
-    firstYear: c.firstYear, lastYear: c.lastYear, top, datasets: ['NASA POWER rain and temperature'],
+    firstYear: item.result.years?.[0]?.year ?? c.firstYear, lastYear: item.result.years?.at(-1)?.year ?? c.lastYear, top, datasets: ['NASA POWER rain and temperature'],
   });
 }
 

@@ -37,7 +37,7 @@ test('finding picks the right sentence', () => {
   assert.deepEqual(thin.say[0].vals, [2, 'crop', 1, '2009']);
   const fine = finding(mk([y(0.9)], 0, { waterMedianMm: 497.2 }), { word: 'rice', saferName: 'X', saferFailed: 0 });
   assert.equal(fine.kind, 'fine');
-  assert.deepEqual(fine.say.map((l) => l.vals), [[1, 'rice'], [200], [497], ['X']]);
+  assert.deepEqual(fine.say.map((l) => l.vals), [[1, 'rice'], [], [200], [497], [], ['X']]);
   assert.equal(fine.safer, true);
   assert.deepEqual(lostYears(mk([{ ...y(0, true), year: 7 }], 1)), [7]);
 });

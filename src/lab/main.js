@@ -180,13 +180,14 @@ const LOCATING = {
   denied: 'We could not get your location. Pick the nearest place above.',
   offline: 'No signal, and this phone has no copy for your field yet. Pick the nearest place above.',
   nogeo: 'This phone cannot tell us where it is. Pick the nearest place above.',
+  noanswer: 'NASA did not answer for your field. Try again later, or pick the nearest place above.',
 };
 function minePanel() {
   const busy = state.locating === 'finding' || state.locating === 'fetching';
   const last = lastField();
   return `<div class="mine">
     <p class="q">${T('Or use your own field')}</p>
-    <p class="small muted">${T('We fetch NASA weather for the spot where you stand, for every day since 2001.')} ${T('Your location stays on this phone.')}</p>
+    <p class="small muted">${T('We fetch NASA weather for the spot where you stand, for every day since 2001.')} ${T('We send your rough spot, to about 1 km, to NASA.')} ${T('Nothing else leaves this phone.')}</p>
     <div class="step-actions">
       <button type="button" class="btn primary" data-act="mine" data-v="here" data-fid="mine-here" ${busy ? 'disabled' : ''}>${T('Use my location')}</button>
       ${last && !busy ? `<button type="button" class="btn" data-act="mine" data-v="last" data-fid="mine-last">${F('My last field ({}, {})', last.lat.toFixed(2), last.lon.toFixed(2))}</button>` : ''}
@@ -197,11 +198,11 @@ function minePanel() {
 /** One plain line on whose ways of planting we borrowed, and whether the flood rule is on. */
 function mineLine() {
   const m = state.mine;
-  const near = f('We use the ways of planting from the nearest place we know: {}, about {} km away.', t(REGION_NAMES[m.near.region]), m.near.km);
-  const flood = m.near.flood ? t('Your field is in the haor basin, so we check the flash flood from the hills.') : t('Your field is outside the haor basin, so we do not check flash floods.');
+  const near = `${f('We borrow the ways of planting from {}.', t(REGION_NAMES[m.near.region]))} ${f('It is about {} km away.', m.near.km)}`;
+  const flood = m.near.flood ? `${t('Your field is in the haor basin.')} ${t('We check the flash flood from the hills.')}` : `${t('Your field is outside the haor basin.')} ${t('We do not check flash floods.')}`;
   return `${near} ${flood}`;
 }
-const mineNote = () => (state.mine ? `<p class="status">${esc(mineLine())}${state.mine.cached ? ` ${T('(from the copy on this phone)')}` : ''}</p>` : '');
+const mineNote = () => (state.mine ? `<p class="status">${esc(mineLine())}${state.mine.cached ? ` ${T('(from the copy on this phone)')}` : ''}${state.mine.climate.missing_values_filled > 0 ? ` ${F('NASA had gaps here. We filled {} values.', state.mine.climate.missing_values_filled)}` : ''}</p>` : '');
 
 function here() {
   return new Promise((ok, no) => navigator.geolocation.getCurrentPosition(
@@ -221,7 +222,8 @@ async function useMyField(useLast) {
   let got;
   try { got = await fetchFieldClimate(point); } catch (e) {
     console.warn(e);
-    if (my === token) { state.locating = 'offline'; renderSteps(); }
+    // fetch() rejects with a TypeError when there is no network; anything else is NASA's answer (or lack of one)
+    if (my === token) { state.locating = navigator.onLine === false || e instanceof TypeError ? 'offline' : 'noanswer'; renderSteps(); }
     return;
   }
   if (my !== token) return;
@@ -308,16 +310,18 @@ const cameHome = (item) => {
 // N6, the replay moment: the first time a result is drawn, its squares fill in left to right like years passing.
 // Once per result (region, what-if, way, card or detail), so a re-render after a tap stays still.
 const replayed = new Set();
+/** True while refresh() draws the buttons before the new replay exists: that draw must not use up the once-only keys. */
+let holdReplay = false;
 /** The satellite's lines type in once per place, like the film's opening; after that they just sit there. */
 function typedOnce() {
   const k = `sat|${state.region}|${state.mine ? memoryPlace() : ''}|${state.rainPct}|${state.tempC}`;
-  if (replayed.has(k)) return false;
+  if (holdReplay || replayed.has(k)) return false;
   replayed.add(k);
   return true;
 }
 function replayOnce(item, interactive) {
   const k = [state.region, state.mine ? memoryPlace() : '', state.rainPct, state.tempC, state.soil, state.canIrrigate, item.id, interactive ? 'd' : 'c'].join('|');
-  if (replayed.has(k)) return false;
+  if (holdReplay || replayed.has(k)) return false;
   replayed.add(k);
   return true;
 }
@@ -363,6 +367,7 @@ function fieldPanel() {
     <div class="choices" role="group" aria-label="${esc(t('What is your soil?'))}">${SOIL_CHOICES.map(([v, label]) => `
       <button type="button" class="chip" data-act="soil" data-v="${v}" data-fid="soil-${v || 'none'}" aria-pressed="${state.soil === v}">${T(label)}</button>`).join('')}
     </div>
+    <p class="small muted">${T('How much water each soil holds is our guess, not a soil test.')}</p>
     <p class="q">${T('Can you pump water in the dry season?')}</p>
     <div class="choices" role="group" aria-label="${esc(t('Can you pump water in the dry season?'))}">
       <button type="button" class="chip" data-act="irrigate" data-v="1" data-fid="irr-yes" aria-pressed="${state.canIrrigate}">${T('Yes')}</button>
@@ -482,7 +487,7 @@ function renderPrint() {
     ${state.rainPct || state.tempC ? `<p><b>${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</b></p>` : ''}
     <p>${F('Ways of planting, tested on {} years of NASA weather', ex.result.summary.n)}</p>
     <table>
-      <thead><tr><th>${T('Way of planting')}</th><th>${T('Years the crop came home')}</th><th>${T('Empty days a year')}</th><th>${T('Pumped water, mm a year')}</th><th>${T('Hardest years')}</th></tr></thead>
+      <thead><tr><th>${T('Way of planting')}</th><th>${T('Years the crop came home')}</th><th>${T('Empty days a year')}</th><th>${T('Water beyond rain, mm a year')}</th><th>${T('Hardest years')}</th></tr></thead>
       <tbody>${rows.map((it) => {
     const s = it.result.summary, bad = failedYearList(it.result);
     return `<tr><td>${T(it.rotation.label)}${it.rotation.existing ? `<br><i>${T('What you grow now')}</i>` : ''}${(it.rotation.notModelled || []).map((n) => `<br><i>${noteText(n)}</i>`).join('')}</td>
@@ -633,7 +638,7 @@ function renderWay() {
     ${calendarHTML(item)}
     <ul class="facts">
       <li>${s.crops === 1 ? F('In a usual year, {}% of a full crop comes home.', pct(s.harvestMedian)) : F('In a usual year, about {} of {} full crops come home.', oneDecimal(s.harvestMedian), s.crops)}</li>
-      <li>${water >= 1 ? F('Water you must pump: about {} mm a year.', water) : T('No pumped water needed.')}</li>
+      <li>${water >= 1 ? F('Water the crop needs beyond rain: about {} mm a year.', water) : T('No pumped water needed.')}</li>
       <li>${F('Soil: this way gives {} back to the soil.', t(soilWord(s.soilScore)))} <span class="tiny faint">${T('(our estimate, not a soil test)')}</span></li>
       <li>${F('Your field lies empty {} days a year.', s.bareDays)}</li>
     </ul>
@@ -726,7 +731,8 @@ function recompute() {
 /** An answer changed. Show the buttons now; if the replay needs the climate file, fetch it once, then replay. */
 async function refresh() {
   const my = ++token, region = state.region;
-  renderSteps();
+  holdReplay = true;
+  try { renderSteps(); } finally { holdReplay = false; }
   if (needsClimate(state) && !state.mine && !climates.has(region)) {
     await getClimate(region);
     if (my !== token) return;
@@ -793,7 +799,7 @@ document.addEventListener('click', async (e) => {
     if (mine[year] === say) delete mine[year]; else mine[year] = say;   // tap the same answer again to take it back
     saveMemory(); renderSteps(); return;
   }
-  if (act === 'mem-clear') { delete state.memory[state.region]; saveMemory(); renderSteps(); return; }
+  if (act === 'mem-clear') { delete state.memory[memoryPlace()]; saveMemory(); renderSteps(); return; }
   if (act === 'year') {
     const id = b.dataset.rot, year = Number(b.dataset.year);
     state.picked[id] = state.picked[id] === year ? null : year;

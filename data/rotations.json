@@ -1,11 +1,11 @@
 {
- "_about": "Rotations compared in the Rotation Lab. Patterns and area shares are from the 2014-15 cropping-pattern surveys in Bangladesh Rice Journal 21(2) (Nasim et al. 2017 and regional papers). Sow dates are trial dates or assumptions and need local review. Collected with AI help on 11 Nov 2026, not yet reviewed by the team's research lead.",
+ "_about": "Rotations compared in the Rotation Lab. Patterns and area shares are from the 2014-15 cropping-pattern surveys in Bangladesh Rice Journal 21(2) (Nasim et al. 2017 and regional papers). Sow dates are trial dates or assumptions and need local review. Boro is transplanted on 5 January (first week of January in the trial at https://banglajol.info/index.php/AGRIC/article/view/31347/21090) and T. Aman on 25 July (the best of three dates in the trial at https://csa.ru.ac.bd/bjals/Volume3(2022)/v0302202210.pdf). The flood flag on haor boro is our rule, not a sourced value. Every share and URL was opened and compared by an AI (not a field expert) on 12 Nov 2026; see docs/AI_USAGE.md. Collected with AI help on 11 Nov 2026, not yet reviewed by the team's research lead.",
  "haor": [
   {
    "id": "existing",
    "existing": true,
    "label": "Boro - Fallow - Fallow",
-   "share": "39.6% of the Sylhet region's cropped area; 45-88% in Sunamganj upazilas",
+   "share": "39.6% of the Sylhet region's cropped area; 39-88% in Sunamganj upazilas",
    "slots": [
     {
      "crop": "boro_long",
@@ -14,7 +14,7 @@
     }
    ],
    "source": "https://banglajol.info/index.php/BRJ/article/download/38211/25995",
-   "sowNote": "Transplanting in the first week of January (trial date)."
+   "sowNote": "Transplanting in the first week of January (trial date, https://banglajol.info/index.php/AGRIC/article/view/31347/21090)."
   },
   {
    "id": "short",
@@ -80,7 +80,7 @@
   {
    "id": "lentil",
    "label": "Lentil - Fallow - T. Aman",
-   "share": "0.6% of the Rajshahi region; the survey recommends lentil for single T. Aman land",
+   "share": "0.6% of the Rajshahi region",
    "slots": [
     {
      "crop": "lentil",
@@ -92,7 +92,7 @@
     }
    ],
    "source": "https://banglajol.info/index.php/BRJ/article/download/38209/25993",
-   "sowNote": "Lentil sown in the last week of November (https://repo.mel.cgiar.org/items/2a84853a-e525-4533-b568-53ba48795b9e/full)."
+   "sowNote": "Lentil sowing date is an assumption. The variety can be sown up to the first week of December (https://repo.mel.cgiar.org/items/2a84853a-e525-4533-b568-53ba48795b9e/full)."
   },
   {
    "id": "mustard_boro",
@@ -121,7 +121,7 @@
    "id": "existing",
    "existing": true,
    "label": "Fallow - Fallow - T. Aman",
-   "share": "26.8% of the Khulna region; the most common pattern in 17 of 25 upazilas",
+   "share": "26.8% of the Khulna region; grown in 17 of 25 upazilas",
    "slots": [
     {
      "crop": "t_aman",
@@ -133,7 +133,7 @@
   {
    "id": "boro",
    "label": "Boro - Fallow - T. Aman",
-   "share": "about a third of Satkhira's cropped area (approximate)",
+   "share": "22.2% of the Khulna region; 9-56% in Satkhira upazilas",
    "slots": [
     {
      "crop": "boro_long",
@@ -161,7 +161,7 @@
     }
    ],
    "source": "https://banglajol.info/index.php/BRJ/article/download/38207/25991",
-   "sowNote": "Sunflower sown before 15 December, when coastal trials found less salt and more yield (https://library.dpird.wa.gov.au/fc_researchart/148)."
+   "sowNote": "Sunflower sown before 15 December, when coastal trials found less salt and more yield (https://library.dpird.wa.gov.au/fc_researchart/148). The exact day is an assumption."
   }
  ]
 }

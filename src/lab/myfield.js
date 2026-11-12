@@ -93,6 +93,8 @@ async function getParams(pt, params, signal) {
   if (!r.ok) throw new Error(`POWER ${r.status}`);
   const p = (await r.json())?.properties?.parameter;
   if (!p) throw new Error('POWER returned no data');
+  // Same rule as data-pipeline/fetch_climate.py: a parameter POWER left out is an error, never a silent fill.
+  for (const name of params) if (!p[name] || !Object.keys(p[name]).length) throw new Error(`POWER returned no ${name}`);
   return p;
 }
 
@@ -100,6 +102,9 @@ async function getParams(pt, params, signal) {
  * 25 years of NASA POWER for one point. Uses the copy on this phone if there is one (the past does not change);
  * otherwise fetches and keeps it. Resolves to { climate, point, near, cached }. Throws when offline with no copy.
  */
+/** More than this share of missing values and we refuse to replay: it would be our fills, not NASA's record. */
+export const MAX_FILL_SHARE = 0.02;
+
 export async function fetchFieldClimate(raw, { timeoutMs = 90000 } = {}) {
   const point = roundPoint(raw);
   const near = nearestRegion(point);
@@ -114,6 +119,9 @@ export async function fetchFieldClimate(raw, { timeoutMs = 90000 } = {}) {
       near.flood ? getParams(UPSTREAM, ['PRECTOTCORR'], ctl.signal).then((p) => p.PRECTOTCORR) : null,
     ]);
     const climate = toClimate(farm, up, { ...point, flood: near.flood });
+    if (climate.missing_values_filled > MAX_FILL_SHARE * climate.n * (Object.keys(PARAM_MAP).length + 1)) {
+      throw new Error(`POWER record has ${climate.missing_values_filled} missing values`);
+    }
     remember(storeKey(point), climate);   // about 300 KB; if the phone is full it is simply not kept
     return { climate, point, near, cached: false };
   } finally {

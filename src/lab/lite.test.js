@@ -41,7 +41,7 @@ test('the lite pages have no English left over (every sentence has a Bengali ent
   for (const region of REGIONS) {
     const text = built[`lite/${region}.html`].replace(/<style>[\s\S]*?<\/style>/, '').replace(/<[^>]+>/g, ' ');
     const words = text.match(/[A-Za-z]{4,}/g) || [];
-    const allowed = new Set(['NASA', 'POWER', 'body', 'bochorer', 'moddhe', 'kharap', 'jeto', 'Krishi', 'kormokortake', 'jiggesh', 'korun', 'bochor', 'Sunamganj', 'haor', 'Barind', 'Satkhira', 'uposhul', 'Boro', 'dhan', 'Aman', 'Chhoto', 'boro', 'Sorisha', 'Moshur', 'Surjomukhi', 'Daily', 'community', 'nirapod', 'upay', 'cheye', 'kono', 'jeto', 'pai', 'bhalo']);
+    const allowed = new Set(['NASA', 'POWER', 'body', 'bochorer', 'moddhe', 'kharap', 'jeto', 'Krishi', 'kormokortake', 'jiggesh', 'korun', 'bochor', 'Sunamganj', 'haor', 'Barind', 'Satkhira', 'uposhul', 'Boro', 'dhan', 'Aman', 'Chhoto', 'boro', 'Sorisha', 'Moshur', 'Surjomukhi', 'Daily', 'community', 'nirapod', 'upay', 'cheye', 'kono', 'jeto', 'pai', 'bhalo', 'bochore', 'brishti', 'gorome', 'noshto', 'hoyni', 'Jhor', 'lobon', 'dhora']);
     assert.deepEqual(words.filter((w) => !allowed.has(w)), [], region);
   }
 });

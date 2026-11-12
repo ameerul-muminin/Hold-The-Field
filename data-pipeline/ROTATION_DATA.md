@@ -14,7 +14,8 @@ columnar, one array per line: `rainFarm`, `rainUp`, `tmax`, `tmin`, `soil` (GWET
 (GWETTOP), `rad`, plus `rainImerg` only if POWER serves `IMERG_PRECTOT`. Missing values (-999) are
 filled and counted in `missing_values_filled`. Schema: `docs/SPEC.md`, "Data contract".
 
-**`data/ndvi/<region>.json`** - MODIS MOD13Q1 250 m 16-day NDVI at the farm point from the ORNL DAAC
+**`data/ndvi/<region>.json`** - NOT BUILT: no NDVI file has been downloaded and no code reads one, so no MODIS data is
+used or claimed anywhere. The fetcher below is unrun. Planned content: MODIS MOD13Q1 250 m 16-day NDVI at the farm point from the ORNL DAAC
 subset API: `series` of `{date, ndvi}`; missing composites are skipped and counted in the console summary.
 
 Expected run time: climate about 1-3 minutes per region (more if it falls back to 5-year chunks);

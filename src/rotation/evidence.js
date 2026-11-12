@@ -1,12 +1,15 @@
 // The five blocks the challenge asks for. Every line is {text, vals}: text is an ENGLISH TEMPLATE with {}
 // placeholders, vals the values. The UI translates the template, so numbers never live inside text.
 
-export const CROP_GAP_FIELDS = ['ky', 'heatC', 'price', 'market', 'forage', 'cover', 'organicMatter'];
+export const CROP_GAP_FIELDS = ['ky', 'heatC', 'irrigated', 'stageShare', 'residue', 'price', 'market', 'forage', 'cover', 'organicMatter'];
 
 export const FIXED_GAPS = [
   { text: 'No market prices in the model', vals: [] },
   { text: 'No salinity data', vals: [] },
   { text: 'No pest or disease model', vals: [] },
+  { text: 'No storm or waterlogging model', vals: [] },
+  { text: 'Water lost by seepage and land preparation is not counted', vals: [] },
+  { text: 'How much water the soil holds is our guess, not a measurement', vals: [] },
   { text: 'One NASA POWER grid cell is about {} km wide; your field can differ', vals: [50] },
 ];
 
@@ -38,7 +41,9 @@ export function evidenceCard(rotation, result, crops, baseline, meta) {
     line('Came through {} of {} years ({} to {})', s.n - s.failedYears, s.n, meta.firstYear, meta.lastYear),
     line('Data: {}', meta.datasets.join(', ')),
   ];
-  if (s.worstYears?.length) evidence.push(line('Worst years: {}', s.worstYears.join(', ')));
+  // Only years that actually failed: the three lowest years of a way that never failed are still good years.
+  const bad = result.years ? result.years.filter((y) => y.failed).map((y) => y.year) : (s.failedYears > 0 ? s.worstYears ?? [] : []);
+  if (bad.length) evidence.push(line('Worst years: {}', bad.join(', ')));
 
   const benefits = [];
   if (baseline && !rotation.existing) {

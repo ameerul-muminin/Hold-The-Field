@@ -34,7 +34,7 @@ Model column: S = Sonnet (default), O = Opus (only if Sonnet fails twice), F = F
   recalibrate per `docs/DATA.md`, remove the SAMPLE badge. Sim numbers change: update Java `Config` too or
   leave the desktop build on the old file and say so in the README.
 - [ ] **T12 Field test** (H). 3 to 5 farmers or one extension officer, Thursday. Notes in `docs/FIELD_TEST.md`.
-- [ ] **R2 Review** (F). `spec-reviewer` on the whole diff. Then record the demo.
+- [x] **R2 Review** (F). `spec-reviewer` on the whole diff (done 12 Nov as N8). Then record the demo (still to do).
 
 ## Submission (Fri 13 Nov 6:30 PM video 2; Sat 14 Nov morning NASA page + 30 s video)
 

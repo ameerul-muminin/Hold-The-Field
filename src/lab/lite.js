@@ -34,8 +34,8 @@ export function smsTexts(region, items) {
   if (s.failedYears === 0) {
     return {
       variant: 'fine',
-      bn: f('{}: in {} years, {} had no bad year. Ask your extension officer.', place, n, whatBn(ex.rotation)),
-      en: `${placeEn}: ${n} bochorer moddhe ${whatEn(ex.rotation)} kono bochor kharap jeto na. Krishi kormokortake jiggesh korun.`,
+      bn: f('{}: in {} years, rain and heat did not take {}. Storms and salt are not counted. Ask your extension officer.', place, n, whatBn(ex.rotation)),
+      en: `${placeEn}: ${n} bochore brishti ba gorome ${whatEn(ex.rotation)} noshto hoyni. Jhor o lobon dhora hoyni. Krishi kormokortake jiggesh korun.`,
     };
   }
   if (!safer) {
@@ -110,7 +110,7 @@ export function liteHTML({ region, items, sms, facts, sample = false }) {
     const bad = failedYearList(it.result);
     return `<li><h3>${T(it.rotation.label)}</h3>${it.rotation.existing ? `<p class="m">${T('What you grow now')}</p>` : ''}${(it.rotation.notModelled || []).map((n) => `<p class="m">${T(plain({ text: n, vals: [] }).text)}</p>`).join('')}
 <p>${L('{} of {} years, the {} came home.', s.n - s.failedYears, s.n, t(cropWord(it.rotation)))}${bad.length ? ` ${L('Hardest years: {}.', bad.join(', '))}` : ''}</p>
-<p>${L('Your field lies empty {} days a year.', s.bareDays)} ${water >= 1 ? L('Water you must pump: about {} mm a year.', water) : T('No pumped water needed.')}</p></li>`;
+<p>${L('Your field lies empty {} days a year.', s.bareDays)} ${water >= 1 ? L('Water the crop needs beyond rain: about {} mm a year.', water) : T('No pumped water needed.')}</p></li>`;
   }).join('\n');
   const other = REGIONS.filter((r) => r !== region).map((r) => `<a href="${r}.html">${T(REGION_NAMES[r])}</a>`).join(' · ');
   const weather = f('Weather: {}, {} to {}, at {}, {}. Downloaded {}.', t(facts.source), facts.first, facts.last, facts.lat, facts.lon, facts.fetched ? date(facts.fetched) : '-');

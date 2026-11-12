@@ -33,19 +33,24 @@ No crop is "lost" in any year in these regions because the model has no flood, s
 yields only fall with water shortage and heat. Treat the Barind and coast results as a comparison of water demand,
 bare-field time and soil traits, not as a risk forecast. A documented drought year to test against: 2006
 (north-west output down 25-30%, https://pmc.ncbi.nlm.nih.gov/articles/PMC9712418). In the model 2006 is among the
-three worst years for Mustard - Boro - T. Aman and for the coast's existing rotation, and not for the others.
+three lowest years for Mustard - Boro - T. Aman in the Barind and for Boro - Fallow - T. Aman on the coast, and not for the
+others (checked again on 12 Nov after the T. Aman field days were corrected from 118 to 98).
 
 ## 3. Known weaknesses
 
 - Yield response to water shortage (Ky) is unsourced for rice and mustard; a default of 1.0 is used and shown as a gap.
 - Winter crops (lentil, mustard, sunflower) are treated as fully rainfed, with a 100 mm root-zone store unless the
-  farmer picks a soil. Lentil scores low as a result; real lentil is grown on residual moisture and may do better.
+  farmer picks a soil. The result is sensitive to this: with T. Aman at 118 field days lentil failed in 5 of 24 years,
+  with the corrected 98 days it fails in none. Real lentil is grown on residual moisture; treat the lentil result as weak.
 - Hargreaves reference evapotranspiration tends to overestimate in humid monsoon months.
 - Rice water demand ignores puddling and percolation, so irrigation figures for boro are too low in absolute terms.
   Use them to compare rotations, not as a pumping requirement.
 - Soil store capacities by soil type (clay 140, loam 110, sandy 60 mm) are placeholders with no source yet.
 - The soil health figure is built from rotation traits (legume, crop families, bare days, root depth). It is an
   indicator, never a measurement; residue, fodder, erosion cover and organic matter have no sourced values yet.
+- Field days are growth duration minus seedbed days. For boro (118 and 98 days) that is shorter than the cited trial's
+  own dates (transplanted in the first week of January, harvested 26 April and 9 May: about 111 and 124 days). The
+  short boro result in the haor (lost only in 2017) depends on this and needs the research lead's check.
 - One NASA POWER cell is about 50 km wide. No field-scale data is used.
 - GPM IMERG: NASA POWER's daily API did not return `IMERG_PRECTOT` on 11 Nov 2026, so no GPM data is used or claimed.
 - MODIS NDVI: fetcher written (`data-pipeline/fetch_ndvi.py`) but no data downloaded yet, so none is used or claimed.

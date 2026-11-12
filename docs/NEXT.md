@@ -16,7 +16,7 @@ Setup once: `npx skills@latest add emilkowalski/skills` (Emil Kowalski's design-
 | N5 ✓ | **Small phones.** `scripts/build-lab.mjs`: precomputed `data/lab/<region>.json`, `lite/<region>.html` and the SMS texts, per `docs/DESIGN.md` "Small phones". Lab loads the precomputed result first. "Send by SMS" and "Print" (one-page print stylesheet for the extension officer). Add `npm run build-lab`. | Sonnet | Impact, UX |
 | N6 ✓ | **The replay moment.** The 25 squares fill in as years pass; lost year gets the blue wash. Skills: `animate`, `choreograph`, then `review-animations`. Nothing else moves. | Sonnet | Presentation |
 | N7 ✓ | **My own field.** "Use my location" (and a typed village is NOT needed): fetch NASA POWER for that point in the browser (pattern and cache in `src/field/power.js`), replay on it. Flood rule only inside the haor basin (`inHaorBasin`). Use the nearest region's rotations and say so. Works offline from the last answer. | Sonnet (Opus if stuck) | Impact (any farm on Earth), Relevance |
-| N8 | **Review.** Run `spec-reviewer` and `number-checker`. Fix findings. Re-check old game loops 1 and 2 in the browser. Push, deploy. | Fable | Validity |
+| N8 ✓ | **Review.** Run `spec-reviewer` and `number-checker`. Fix findings. Re-check old game loops 1 and 2 in the browser. Push, deploy. | Fable | Validity |
 
 If time runs out, cut from the bottom of this list upward: N7 first, then N6. Never cut N1, N2, N5, N8.
 

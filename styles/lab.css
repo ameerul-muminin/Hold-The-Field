@@ -244,6 +244,19 @@ p, li, dd, .h1, .h2, .h3 { overflow-wrap: break-word; }
 .yr:focus-visible { outline-offset: 0; }
 .strip[role="group"] + .strip-ends { display: none; }
 
+/* N6, the replay moment: squares fill in left to right, 40 ms apart, like years passing; a lost year lands with
+   a short flood wash. Only transform and opacity. The only motion on the page besides tap feedback. */
+.strip.replay .yr > span:first-child {
+  position: relative;
+  animation: yr-in 280ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms);
+}
+.strip.replay .yr-lost > span:first-child::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 3px; background: var(--water-2); opacity: 0;
+  animation: yr-wash 520ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms + 200ms);
+}
+@keyframes yr-in { from { opacity: 0; transform: scaleY(.35); } to { opacity: 1; transform: none; } }
+@keyframes yr-wash { 0% { opacity: 0; transform: scale(.8); } 35% { opacity: .75; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.25); } }
+
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: var(--fs-cap); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 2px; background-size: 100% 100%; }
@@ -302,6 +315,10 @@ p, li, dd, .h1, .h2, .h3 { overflow-wrap: break-word; }
 .term { display: flex; flex-direction: column; }
 .term .link { font-size: var(--fs-sub); font-weight: 400; }
 .term-body { padding: 0 0 8px; color: var(--ink-2); font-size: var(--fs-sub); }
+
+/* N7: your own field, under the three places */
+.mine { margin-top: 22px; padding-top: 16px; background: var(--ruled) 0 0 / 100% 6px no-repeat; }
+.mine .btn[disabled] { opacity: .55; cursor: progress; }
 
 /* ---------------------------------------------------------------- footer */
 .foot {

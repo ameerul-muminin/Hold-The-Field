@@ -216,11 +216,11 @@ export const uniqueCrops = (rotations) => [...new Set(rotations.flatMap((r) => r
  * Replay every rotation of a region for the farmer's answers and the what-if.
  * @returns {{opts:object, items:{id:string, rotation:object, result:object}[]}}
  */
-export function computeAll({ region, rotations, crops, climate, answers = {}, whatIf = {} }) {
+export function computeAll({ region, rotations, crops, climate, answers = {}, whatIf = {}, flood }) {
   const adj = applyFarmer(rotations, crops, answers);
   const rainPct = whatIf.rainPct || 0, tempC = whatIf.tempC || 0;
   const clim = rainPct || tempC ? perturb(climate, { rainPct, tempC }) : climate;
-  const opts = { ...adj.opts, floodRegion: region === 'haor' };
+  const opts = { ...adj.opts, floodRegion: flood ?? region === 'haor' };   // flood: a field of its own (N7) says itself
   const items = adj.rotations.map((rotation) => ({ id: rotation.id, rotation, result: replay(rotation, crops, clim, opts) }));
   return { opts, items, clim };
 }

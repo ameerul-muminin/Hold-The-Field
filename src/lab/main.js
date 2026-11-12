@@ -15,6 +15,7 @@ import {
 } from './view.js';
 import { itemsFromPre, needsClimate } from './pre.js';
 import { smsHref, liteHref, smsTexts, checkSms } from './lite.js';
+import { fetchFieldClimate, lastField } from './myfield.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,6 +32,8 @@ const state = {
   prio: prioFor('safety'),
   open: {}, picked: {}, status: 'loading',
   memory: loadMemory(),
+  mine: null,          // N7 "my own field": { point, near, climate, cached } while the farmer looks at their own spot
+  locating: '',        // '', 'finding', 'fetching', or an error key
 };
 // What the farmer remembers lives on this phone only: { region: { year: true|false } }.
 function memoryKey() { return `${BRAND.storageKey}-lab-memory`; }
@@ -62,11 +65,13 @@ function setHTML(el, html) {
 }
 const cropName = (id) => t(crops[id]?.name ?? id);
 const cropShort = (id) => t(CROP_SHORT[id] ?? crops[id]?.name ?? id);
-const climate = () => climates.get(state.region) || null;
+const climate = () => (state.mine ? state.mine.climate : climates.get(state.region) || null);
 const regionRotations = () => rotationsByRegion[state.region] || [];
 const existing = () => results.items.find((i) => i.rotation.existing) || null;
 const itemById = (id) => results.items.find((i) => i.id === id) || null;
-const isFlood = () => state.region === 'haor';
+const isFlood = () => (state.mine ? state.mine.near.flood : state.region === 'haor');
+/** The place named on screen: the region, or the farmer's own field. */
+const placeName = () => (state.mine ? f('Your field ({}, {})', state.mine.point.lat.toFixed(2), state.mine.point.lon.toFixed(2)) : t(REGION_NAMES[state.region]));
 
 /** A {text, vals} line -> plain words, translated. String values are translated, numbers are not. */
 function lineText(l) {
@@ -162,8 +167,68 @@ function renderWhere() {
     <h2 class="h2" id="h-where" tabindex="-1" data-step-title>${T('Where is your field?')}</h2>
     <p class="lede">${T('We look back at past NASA weather. We see how each way of planting would have done.')}</p>
     <div class="regions" role="group" aria-labelledby="h-where">${REGIONS.map((r) => `
-      <button type="button" class="region" data-act="region" data-v="${r}" data-region="${r}" data-fid="region-${r}" aria-pressed="${state.region === r && results.items.length > 0}">${T(REGION_NAMES[r])}</button>`).join('')}
-    </div>`;
+      <button type="button" class="region" data-act="region" data-v="${r}" data-region="${r}" data-fid="region-${r}" aria-pressed="${!state.mine && state.region === r && results.items.length > 0}">${T(REGION_NAMES[r])}</button>`).join('')}
+    </div>
+    ${minePanel()}`;
+}
+
+// ---- N7 "my own field": 25 years of NASA POWER for the farmer's own spot, fetched in the browser
+const LOCATING = {
+  finding: 'Finding where you are…',
+  fetching: 'Fetching 25 years of NASA weather for your field. This can take a minute.',
+  denied: 'We could not get your location. Pick the nearest place above.',
+  offline: 'No signal, and this phone has no copy for your field yet. Pick the nearest place above.',
+  nogeo: 'This phone cannot tell us where it is. Pick the nearest place above.',
+};
+function minePanel() {
+  const busy = state.locating === 'finding' || state.locating === 'fetching';
+  const last = lastField();
+  return `<div class="mine">
+    <p class="q">${T('Or use your own field')}</p>
+    <p class="small muted">${T('We fetch NASA weather for the spot where you stand, for every day since 2001.')} ${T('Your location stays on this phone.')}</p>
+    <div class="step-actions">
+      <button type="button" class="btn primary" data-act="mine" data-v="here" data-fid="mine-here" ${busy ? 'disabled' : ''}>${T('Use my location')}</button>
+      ${last && !busy ? `<button type="button" class="btn" data-act="mine" data-v="last" data-fid="mine-last">${F('My last field ({}, {})', last.lat.toFixed(2), last.lon.toFixed(2))}</button>` : ''}
+    </div>
+    ${state.locating ? `<p class="status${busy ? '' : ' warn'}" role="status">${T(LOCATING[state.locating])}</p>` : ''}
+  </div>`;
+}
+/** One plain line on whose ways of planting we borrowed, and whether the flood rule is on. */
+function mineLine() {
+  const m = state.mine;
+  const near = f('We use the ways of planting from the nearest place we know: {}, about {} km away.', t(REGION_NAMES[m.near.region]), m.near.km);
+  const flood = m.near.flood ? t('Your field is in the haor basin, so we check the flash flood from the hills.') : t('Your field is outside the haor basin, so we do not check flash floods.');
+  return `${near} ${flood}`;
+}
+const mineNote = () => (state.mine ? `<p class="status">${esc(mineLine())}${state.mine.cached ? ` ${T('(from the copy on this phone)')}` : ''}</p>` : '');
+
+function here() {
+  return new Promise((ok, no) => navigator.geolocation.getCurrentPosition(
+    (p) => ok({ lat: p.coords.latitude, lon: p.coords.longitude }), no,
+    { enableHighAccuracy: false, timeout: 20000, maximumAge: 600000 }));
+}
+async function useMyField(useLast) {
+  const my = ++token;
+  let point = useLast ? lastField() : null;
+  if (!point) {
+    if (!navigator.geolocation) { state.locating = 'nogeo'; renderSteps(); return; }
+    state.locating = 'finding'; renderSteps();
+    try { point = await here(); } catch { if (my === token) { state.locating = 'denied'; renderSteps(); } return; }
+    if (my !== token) return;
+  }
+  state.locating = 'fetching'; renderSteps();
+  let got;
+  try { got = await fetchFieldClimate(point); } catch (e) {
+    console.warn(e);
+    if (my === token) { state.locating = 'offline'; renderSteps(); }
+    return;
+  }
+  if (my !== token) return;
+  state.region = got.near.region; state.mine = got; state.locating = '';
+  state.cannotSell = []; state.noMachine = []; state.picked = {};
+  recompute();
+  go('saw');
+  renderFooter();
 }
 
 // ---------------------------------------------------------------- step 2: what the satellite saw
@@ -184,11 +249,12 @@ function renderSaw() {
   const what = [...new Set(ex.rotation.slots.map((s) => s.crop))].map(cropShort).join(' + ');
   const sat = [
     { text: 'NASA POWER · {}-{}', vals: [facts.first, facts.last] },
-    { text: '{}, {}', vals: [what, t(REGION_NAMES[state.region])] },
+    { text: '{}, {}', vals: [what, placeName()] },
     ...fd.sat,
   ];
   return `${head}
     ${whatIfNote()}
+    ${mineNote()}
     <p class="small muted">${F('What you grow now: {}', t(ex.rotation.label))}</p>
     <div class="sat" role="group" aria-label="${esc(t('What the satellite saw'))}">
       ${sat.map((l) => `<p>${lineText(l)}</p>`).join('')}
@@ -238,17 +304,28 @@ const cameHome = (item) => {
   const s = item.result.summary;
   return F('{} of {} years, the {} came home.', s.n - s.failedYears, s.n, t(cropWord(item.rotation)));
 };
+// N6, the replay moment: the first time a result is drawn, its squares fill in left to right like years passing.
+// Once per result (region, what-if, way, card or detail), so a re-render after a tap stays still.
+const replayed = new Set();
+function replayOnce(item, interactive) {
+  const k = [state.region, state.mine ? memoryPlace() : '', state.rainPct, state.tempC, state.soil, state.canIrrigate, item.id, interactive ? 'd' : 'c'].join('|');
+  if (replayed.has(k)) return false;
+  replayed.add(k);
+  return true;
+}
 function stripHTML(item, interactive) {
   const years = item.result.years;
   const picked = state.picked[item.id];
-  const cells = years.map((y) => {
+  const replay = replayOnce(item, interactive);
+  const cells = years.map((y, i) => {
     const c = yearClass(y);
     const label = esc(num(y.year) + ': ' + t(YEAR_LABEL[c]));
+    const at = replay ? ` style="--i:${i}"` : '';
     return interactive
-      ? `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(item.id)}" data-year="${y.year}" data-fid="yr-${esc(item.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${label}"><span></span><span class="yr-n" aria-hidden="true">${esc(num(String(y.year).slice(2)))}</span></button>`
-      : `<span class="yr yr-${c}"><span></span></span>`;
+      ? `<button type="button" class="yr yr-${c}" data-act="year" data-rot="${esc(item.id)}" data-year="${y.year}" data-fid="yr-${esc(item.id)}-${y.year}" aria-pressed="${picked === y.year}" aria-label="${label}"${at}><span></span><span class="yr-n" aria-hidden="true">${esc(num(String(y.year).slice(2)))}</span></button>`
+      : `<span class="yr yr-${c}"${at}><span></span></span>`;
   }).join('');
-  return `<div class="strip"${interactive ? ` role="group" aria-label="${esc(t('Year by year'))}"` : ' aria-hidden="true"'}>${cells}</div>
+  return `<div class="strip${replay ? ' replay' : ''}"${interactive ? ` role="group" aria-label="${esc(t('Year by year'))}"` : ' aria-hidden="true"'}>${cells}</div>
     <div class="strip-ends" aria-hidden="true"><span>${esc(num(years[0]?.year ?? ''))}</span><span>${esc(num(years[years.length - 1]?.year ?? ''))}</span></div>`;
 }
 const legendHTML = () => `<div class="legend" aria-hidden="true">${['good', 'fair', 'poor', 'lost'].map((c) => `<span><i class="yr-${c}"></i>${T(YEAR_LABEL[c])}</span>`).join('')}</div>${colourTerm()}`;
@@ -335,7 +412,8 @@ const mmTerm = () => term('mm', 'What is mm?', `<p>${T('mm is millimetres of wat
 const nasaTerm = () => term('nasa', 'What is NASA POWER?', `<p>${T('NASA POWER: weather records NASA builds from satellites and models, for every place on Earth, every day since 1981.')}</p>`);
 
 // ---- "Is this what you remember?" (N4): the farmer says which years were bad; we set it beside the replay
-const remembered = () => (state.memory[state.region] ||= {});
+const memoryPlace = () => (state.mine ? `mine:${state.mine.point.lat},${state.mine.point.lon}` : state.region);
+const remembered = () => (state.memory[memoryPlace()] ||= {});
 function memoryPanel(ex) {
   const m = memoryAgreement(ex.result, remembered());
   const summary = m.answered
@@ -358,6 +436,7 @@ function memoryPanel(ex) {
 
 // ---- small phones (N5): the message for a button phone, the light page, and the one-page print
 function currentSms() {
+  if (state.mine) return null;   // the texts name a region; your own field is shown on screen only
   if (results.pre?.sms) return results.pre.sms;
   if (state.rainPct || state.tempC || !existing()) return null;   // a what-if guess is not sent as a fact
   // the Bangla text is Bangla whatever language the page shows
@@ -368,7 +447,7 @@ function sharePanel() {
   const link = (text, lang, label) => `<p class="sms" lang="${lang}">${esc(text)}</p>
     <a class="btn" href="${esc(smsHref(text))}">${T('Send by SMS')} (${T(label)})</a>`;
   return `<p class="small muted">${T('The phone in your hand may not open a website. A short message still reaches you. Your extension officer can send it or read it out.')}</p>
-    ${sms ? `${link(sms.bn, 'bn', 'Bangla letters')}${link(sms.en, 'en', 'English letters')}` : (state.rainPct || state.tempC ? `<p class="small muted">${T('Texts are only made for the satellite record, not for a what-if guess.')}</p>` : '')}
+    ${sms ? `${link(sms.bn, 'bn', 'Bangla letters')}${link(sms.en, 'en', 'English letters')}` : state.mine ? `<p class="small muted">${T('Texts are made for the three places we know, not for your own field yet.')}</p>` : (state.rainPct || state.tempC ? `<p class="small muted">${T('Texts are only made for the satellite record, not for a what-if guess.')}</p>` : '')}
     <div class="step-actions">
       <button type="button" class="btn" data-act="print" data-fid="print">${T('Print one page for the extension officer')}</button>
       <a class="btn" href="${esc(liteHref(state.region))}">${T('Light version for small phones')}</a>
@@ -390,7 +469,8 @@ function renderPrint() {
   const rows = rankItems(results.items, state.prio).map((r) => itemById(r.id));
   const sms = currentSms();
   el.innerHTML = `<h1>${esc(BRAND.name)} · ${T('Your field, year by year')}</h1>
-    <p><b>${T(REGION_NAMES[state.region])}</b> · ${T('For the extension officer')}</p>
+    <p><b>${esc(placeName())}</b> · ${T('For the extension officer')}</p>
+    ${state.mine ? `<p>${esc(mineLine())}</p>` : ''}
     ${state.rainPct || state.tempC ? `<p><b>${F('What if: rain {}%, {} °C hotter. A guess, not a forecast.', signed(state.rainPct), signed(state.tempC))}</b></p>` : ''}
     <p>${F('Ways of planting, tested on {} years of NASA weather', ex.result.summary.n)}</p>
     <table>
@@ -607,7 +687,7 @@ async function loadData(region) {
 function recompute() {
   results.pre = null;
   const answers = { soil: state.soil || undefined, canIrrigate: state.canIrrigate, cannotSell: state.cannotSell, noMachine: state.noMachine };
-  if (!needsClimate(state)) {
+  if (!needsClimate(state) && !state.mine) {
     const pre = pres.get(state.region);
     const items = itemsFromPre(pre, regionRotations(), crops, answers);
     if (items) {
@@ -624,6 +704,7 @@ function recompute() {
       region: state.region, rotations: regionRotations(), crops, climate: c,
       answers: { soil: state.soil || undefined, canIrrigate: state.canIrrigate, cannotSell: state.cannotSell, noMachine: state.noMachine },
       whatIf: { rainPct: state.rainPct, tempC: state.tempC },
+      flood: isFlood(),
     });
     results.items = out.items; results.opts = out.opts; results.clim = out.clim;
     results.rows = rankItems(results.items, state.prio);
@@ -637,7 +718,7 @@ function recompute() {
 async function refresh() {
   const my = ++token, region = state.region;
   renderSteps();
-  if (needsClimate(state) && !climates.has(region)) {
+  if (needsClimate(state) && !state.mine && !climates.has(region)) {
     await getClimate(region);
     if (my !== token) return;
   }
@@ -646,7 +727,7 @@ async function refresh() {
 
 async function loadRegion(region) {
   const my = ++token;
-  state.region = region;
+  state.region = region; state.mine = null; state.locating = '';
   state.cannotSell = []; state.noMachine = []; state.picked = {};
   Object.keys(state.open).filter((k) => k.startsWith('ev:')).forEach((k) => delete state.open[k]);
   state.status = 'loading'; results.items = []; results.rows = [];
@@ -667,7 +748,7 @@ document.addEventListener('click', async (e) => {
   if (act === 'lang') { if (b.dataset.v !== language()) setLanguage(b.dataset.v); return; }
   if (act === 'region') {
     const r = b.dataset.v;
-    if (r !== state.region || state.status !== 'ready') {
+    if (r !== state.region || state.status !== 'ready' || state.mine) {
       state.region = r; state.status = 'loading'; results.items = []; results.rows = [];
       go('saw');
       if (await loadRegion(r)) renderSteps();
@@ -676,6 +757,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (act === 'print') { window.print(); return; }
+  if (act === 'mine') { useMyField(b.dataset.v === 'last'); return; }
   if (act === 'go') { go(b.dataset.v); return; }
   if (act === 'open') { go('way', b.dataset.v); return; }
   if (act === 'fear') { state.fear = b.dataset.v; state.prio = prioFor(state.fear); renderSteps(); return; }
